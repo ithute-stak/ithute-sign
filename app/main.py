@@ -10,7 +10,7 @@ import shutil
 import uuid
 from pathlib import Path
 import fitz
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QRectF
 from PySide6.QtGui import QPixmap, QImage, QPainter, QPen, QColor
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QLabel, QPushButton,
     QVBoxLayout, QHBoxLayout, QFileDialog, QMessageBox, QScrollArea, QSpinBox,
@@ -337,7 +337,6 @@ class Window(QMainWindow):
         event.accept()
 
 if __name__ == "__main__":
-    from PySide6.QtCore import QRectF
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
     window = Window()
