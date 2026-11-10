@@ -1,0 +1,38 @@
+name: IthuteSign source checks
+on:
+  push:
+    branches: [main, import-ithutesign-v0.12]
+  pull_request:
+    branches: [main]
+jobs:
+  python-tests:
+    name: Source unit tests (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile Python source files
+        shell: pwsh
+        run: python -m compileall -q app tests
+      - name: Run offline unit tests
+        shell: pwsh
+        run: python -m unittest discover -s tests -v
+      - name: Verify complete source import before release
+        shell: pwsh
+        run: |
+          $required = @(
+            'app/main.py',
+            'app/document.py',
+            'wacom-bridge/STUCapture.cs',
+            'wacom-bridge/STUCapture.csproj',
+            'installer/IthuteSign.iss',
+            'build-release.bat'
+          )
+          $missing = @($required | Where-Object { -not (Test-Path $_) })
+          if ($missing.Count -gt 0) {
+            Write-Host 'Full Windows release is blocked until these files are imported:'
+            $missing | ForEach-Object { Write-Host "  - $_" }
+            exit 1
+          }
