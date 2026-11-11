@@ -1,119 +1,214 @@
 using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Drawing.Imaging;
 using System.IO;
-using System.Runtime.InteropServices;
-using System.Reflection;
+using System.Windows.Forms;
+using wgssSTU;
 
 namespace IthuteSignWacom
 {
-    /// <summary>
-    /// Native Wacom STU device probe. Capture/display remain deliberately fail-closed
-    /// until the vendor SDK integration and real tablet testing are completed.
-    /// </summary>
     internal static class STUCapture
     {
-        private const int NoDevice = 10;
-        private const int SdkFailure = 11;
-        private const int Unsupported = 12;
-        private const int Unexpected = 13;
-
         [STAThread]
         private static int Main(string[] args)
         {
+            if (args.Length != 1) { Console.Error.WriteLine("Expected --probe or output PNG path."); return 12; }
+            if (args[0] == "--probe") return Probe();
+            if (args[0] == "--welcome" || args[0] == "--thanks")
+            {
+                Console.Error.WriteLine("Tablet display command is pending hardware validation.");
+                return 12;
+            }
+            if (args[0].StartsWith("--")) return 12;
             try
             {
-                if (args.Length == 1 && args[0] == "--probe")
-                    return Probe();
-                if (args.Length == 1 && (args[0] == "--welcome" || args[0] == "--thanks"))
+                Application.EnableVisualStyles();
+                using (var form = new SignatureForm(args[0]))
                 {
-                    Console.Error.WriteLine("Tablet branding is not implemented; refusing to report success.");
-                    return Unsupported;
+                    Application.Run(form);
+                    return form.Saved ? 0 : 1;
                 }
-                if (args.Length == 1 && !args[0].StartsWith("--", StringComparison.Ordinal))
-                {
-                    // Never create a placeholder PNG: a successful capture must be genuine.
-                    Console.Error.WriteLine("Real pen capture and confirmation are not yet implemented.");
-                    return Unsupported;
-                }
-                Console.Error.WriteLine("Usage: STUCapture.exe --probe|--welcome|--thanks|<output.png>");
-                return Unsupported;
             }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine("STU bridge failed: " + ex.Message);
-                return Unexpected;
-            }
+            catch (Exception ex) { Console.Error.WriteLine(ex.Message); return 13; }
         }
 
         private static int Probe()
         {
-            object devices = null;
-            object tablet = null;
             try
             {
-                // Resolve the SDK's COM interop assembly at runtime. This keeps the
-                // executable buildable without hard-coding a vendor SDK version.
-                var assembly = Assembly.Load("Interop.wgssSTU");
-                var devicesType = assembly.GetType("wgssSTU.UsbDevices", true);
-                var tabletType = assembly.GetType("wgssSTU.Tablet", true);
-                devices = Activator.CreateInstance(devicesType);
-                int count = Convert.ToInt32(devicesType.InvokeMember(
-                    "Count", BindingFlags.GetProperty, null, devices, null));
-                if (count < 1)
+                var devices = new UsbDevices();
+                if (devices.Count == 0) { Console.Error.WriteLine("No STU device detected."); return 10; }
+                var tablet = new Tablet();
+                try
                 {
-                    Console.Error.WriteLine("No Wacom STU device detected.");
-                    return NoDevice;
+                    var result = tablet.usbConnect(devices[0], true);
+                    if (result.value != 0) { Console.Error.WriteLine("USB connection failed: " + result.value); return 11; }
+                    var cap = tablet.getCapability();
+                    if (cap == null || cap.tabletMaxX == 0 || cap.tabletMaxY == 0) return 11;
+                    Console.WriteLine("Wacom STU device connected.");
+                    return 0;
                 }
-                var device = devicesType.InvokeMember("Item", BindingFlags.GetProperty,
-                    null, devices, new object[] { 0 });
-                tablet = Activator.CreateInstance(tabletType);
-                // A successful enumeration alone is insufficient: connect to the
-                // actual tablet before returning the connected exit code.
-                tabletType.InvokeMember("usbConnect", BindingFlags.InvokeMethod,
-                    null, tablet, new object[] { device, true });
-                Console.WriteLine("Wacom STU device connected.");
-                return 0;
+                finally { try { tablet.disconnect(); } catch { } }
             }
-            catch (FileNotFoundException ex)
+            catch (Exception ex) { Console.Error.WriteLine("Wacom SDK/driver: " + ex.Message); return 11; }
+        }
+    }
+
+    internal sealed class InkSample
+    {
+        internal float X, Y;
+        internal bool Down;
+    }
+
+    internal sealed class SignatureForm : Form
+    {
+        private readonly string destination;
+        private readonly List<InkSample> ink = new List<InkSample>();
+        private readonly Panel preview = new Panel();
+        private Tablet tablet;
+        private ICapability capability;
+        private bool previousDown;
+        internal bool Saved { get; private set; }
+
+        internal SignatureForm(string path)
+        {
+            destination = Path.GetFullPath(path);
+            Text = "IthuteSign — Wacom STU signing";
+            Width = 850; Height = 410;
+            var header = new Label { Dock = DockStyle.Top, Height = 42,
+                Text = "Sign on the Wacom tablet. Review your handwriting below." };
+            var buttons = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 48 };
+            var clear = new Button { Text = "Clear", Width = 110 };
+            var accept = new Button { Text = "Accept signature", Width = 160 };
+            var cancel = new Button { Text = "Cancel", Width = 110 };
+            clear.Click += (s, e) => { ink.Clear(); preview.Invalidate(); };
+            accept.Click += (s, e) => Save();
+            cancel.Click += (s, e) => Close();
+            buttons.Controls.Add(clear); buttons.Controls.Add(accept); buttons.Controls.Add(cancel);
+            preview.Dock = DockStyle.Fill; preview.BackColor = Color.White;
+            preview.Paint += (s, e) => DrawInk(e.Graphics, preview.ClientRectangle, ink);
+            Controls.Add(preview); Controls.Add(header); Controls.Add(buttons);
+            Shown += (s, e) => Connect();
+            FormClosing += (s, e) => Disconnect();
+        }
+
+        private void Connect()
+        {
+            try
             {
-                Console.Error.WriteLine("Wacom interop assembly missing: " + ex.Message);
-                return SdkFailure;
-            }
-            catch (TypeLoadException ex)
-            {
-                Console.Error.WriteLine("Wacom SDK type unavailable: " + ex.Message);
-                return SdkFailure;
-            }
-            catch (COMException ex)
-            {
-                Console.Error.WriteLine("Wacom USB/COM connection failed: " + ex.Message);
-                return SdkFailure;
-            }
-            catch (TargetInvocationException ex)
-            {
-                Console.Error.WriteLine("Wacom SDK invocation failed: " +
-                    (ex.InnerException == null ? ex.Message : ex.InnerException.Message));
-                return SdkFailure;
+                var devices = new UsbDevices();
+                if (devices.Count == 0) throw new InvalidOperationException("No Wacom STU tablet connected.");
+                tablet = new Tablet();
+                var result = tablet.usbConnect(devices[0], true);
+                if (result.value != 0) throw new InvalidOperationException("STU USB error: " + result.value);
+                capability = tablet.getCapability();
+                if (capability == null || capability.tabletMaxX == 0 || capability.tabletMaxY == 0)
+                    throw new InvalidOperationException("Invalid STU tablet capability.");
+                tablet.onPenData += new ITabletEvents2_onPenDataEventHandler(OnPenData);
+                tablet.setInkingMode(0x01);
             }
             catch (Exception ex)
             {
-                Console.Error.WriteLine("Wacom probe failed: " + ex.Message);
-                return SdkFailure;
+                MessageBox.Show(ex.Message, "Wacom connection error");
+                Close();
             }
-            finally
+        }
+
+        private void OnPenData(IPenData point)
+        {
+            if (capability == null || IsDisposed || !IsHandleCreated) return;
+            float x = Math.Max(0f, Math.Min(1f, (float)point.x / capability.tabletMaxX));
+            float y = Math.Max(0f, Math.Min(1f, (float)point.y / capability.tabletMaxY));
+            bool down = point.sw != 0;
+            try
             {
-                if (tablet != null)
+                BeginInvoke(new Action(() =>
                 {
+                    if (IsDisposed) return;
+                    // Pen-up is a stroke boundary. Do not connect separate strokes.
+                    ink.Add(new InkSample { X = x, Y = y, Down = down });
+                    previousDown = down;
+                    preview.Invalidate();
+                }));
+            }
+            catch (InvalidOperationException) { }
+            catch (ObjectDisposedException) { }
+        }
+
+        private static void DrawInk(Graphics g, Rectangle rect, IList<InkSample> samples)
+        {
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+            using (var pen = new Pen(Color.FromArgb(18, 46, 88), 3f))
+            {
+                pen.StartCap = LineCap.Round; pen.EndCap = LineCap.Round;
+                PointF? previous = null;
+                foreach (var sample in samples)
+                {
+                    if (!sample.Down) { previous = null; continue; }
+                    var p = new PointF(rect.X + sample.X * rect.Width, rect.Y + sample.Y * rect.Height);
+                    if (previous.HasValue) g.DrawLine(pen, previous.Value, p);
+                    else g.FillEllipse(Brushes.DarkBlue, p.X - 1, p.Y - 1, 2, 2);
+                    previous = p;
+                }
+            }
+        }
+
+        private void Save()
+        {
+            int count = 0;
+            foreach (var sample in ink) if (sample.Down) count++;
+            if (count < 4) { MessageBox.Show("Please sign before accepting."); return; }
+            using (var image = new Bitmap(800, 360, PixelFormat.Format32bppArgb))
+            {
+                using (var g = Graphics.FromImage(image))
+                {
+                    g.Clear(Color.Transparent);
+                    DrawInk(g, new Rectangle(10, 10, 780, 340), ink);
+                }
+                var bounds = InkBounds(image);
+                if (bounds.IsEmpty) { MessageBox.Show("No signature ink found."); return; }
+                using (var cropped = image.Clone(bounds, image.PixelFormat))
+                {
+                    string folder = Path.GetDirectoryName(destination);
+                    if (!Directory.Exists(folder)) Directory.CreateDirectory(folder);
+                    // Write to temporary file first; never leave a partial signature.
+                    string temporary = destination + "." + Guid.NewGuid().ToString("N") + ".tmp";
                     try
                     {
-                        tablet.GetType().InvokeMember("disconnect", BindingFlags.InvokeMethod,
-                            null, tablet, new object[0]);
+                        cropped.Save(temporary, ImageFormat.Png);
+                        if (File.Exists(destination)) throw new IOException("Signature output already exists.");
+                        File.Move(temporary, destination);
                     }
-                    catch (Exception) { /* Preserve original probe result. */ }
-                    if (Marshal.IsComObject(tablet)) Marshal.FinalReleaseComObject(tablet);
+                    finally { if (File.Exists(temporary)) File.Delete(temporary); }
                 }
-                if (devices != null && Marshal.IsComObject(devices))
-                    Marshal.FinalReleaseComObject(devices);
             }
+            Saved = true;
+            Close();
+        }
+
+        private static Rectangle InkBounds(Bitmap image)
+        {
+            int left = image.Width, top = image.Height, right = -1, bottom = -1;
+            for (int y = 0; y < image.Height; y++)
+                for (int x = 0; x < image.Width; x++)
+                    if (image.GetPixel(x, y).A != 0)
+                    {
+                        left = Math.Min(left, x); top = Math.Min(top, y);
+                        right = Math.Max(right, x); bottom = Math.Max(bottom, y);
+                    }
+            if (right < 0) return Rectangle.Empty;
+            return Rectangle.FromLTRB(Math.Max(0, left - 8), Math.Max(0, top - 8),
+                Math.Min(image.Width, right + 9), Math.Min(image.Height, bottom + 9));
+        }
+
+        private void Disconnect()
+        {
+            if (tablet == null) return;
+            try { tablet.setInkingMode(0x00); } catch { }
+            try { tablet.disconnect(); } catch { }
+            tablet = null;
         }
     }
 }
