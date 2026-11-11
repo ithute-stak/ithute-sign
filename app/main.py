@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QLabel, QPush
     QVBoxLayout, QHBoxLayout, QFileDialog, QMessageBox, QScrollArea, QSpinBox,
     QDialog, QDialogButtonBox, QListWidget)
 from document import to_pdf, sign_pdf_many, Placement
-from device import probe_bridge, show_screen
+from device import probe_bridge, show_screen, validate_signature_png
 from geometry import fit_rectangle
 
 def root_folder():
@@ -123,6 +123,7 @@ class CaptureDialog(QDialog):
                                     text=True, capture_output=True)
             if result.returncode or not target.is_file():
                 raise RuntimeError(result.stderr.strip() or "STU capture cancelled or failed")
+            validate_signature_png(target)
             picture = QPixmap(str(target))
             if picture.isNull():
                 raise RuntimeError("Invalid STU signature image")
@@ -131,6 +132,7 @@ class CaptureDialog(QDialog):
             self.preview.setPixmap(picture.scaled(520, 95, Qt.KeepAspectRatio,
                                                  Qt.SmoothTransformation))
         except Exception as exc:
+            target.unlink(missing_ok=True)
             QMessageBox.warning(self, "STU capture error", str(exc))
     def export(self, target):
         if self.captured:
