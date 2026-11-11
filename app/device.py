@@ -59,7 +59,6 @@ def show_screen(executable, mode, *, timeout=15, runner=subprocess.run):
 def validate_signature_png(path):
     """Reject missing, empty, opaque, or blank bridge output before PDF insertion."""
     import struct
-    import zlib
     target = Path(path)
     if not target.is_file() or target.stat().st_size < 80:
         raise ValueError("Signature image is missing or empty")
@@ -74,13 +73,13 @@ def validate_signature_png(path):
     if depth != 8 or color_type not in (4, 6):
         raise ValueError("Signature PNG must have an alpha channel")
     # Decode pixels rather than trusting the PNG header or file size.
-    from PIL import Image
-    with Image.open(target) as image:
-        image.load()
-        rgba = image.convert("RGBA")
-        alpha = rgba.getchannel("A")
-        if alpha.getextrema()[1] == 0:
-            raise ValueError("Signature PNG contains no visible ink")
-        if alpha.getextrema()[0] == 255:
-            raise ValueError("Signature PNG has no transparent background")
+    import fitz
+    pixmap = fitz.Pixmap(str(target))
+    if not pixmap.alpha:
+        raise ValueError("Signature PNG has no alpha channel")
+    alpha_bytes = pixmap.samples[pixmap.n - 1::pixmap.n]
+    if not any(alpha_bytes):
+        raise ValueError("Signature PNG contains no visible ink")
+    if all(value == 255 for value in alpha_bytes):
+        raise ValueError("Signature PNG has no transparent background")
     return target
