@@ -17,6 +17,7 @@
       <Private>True</Private>
     </Reference>
     <Compile Include="STUCapture.cs"/>
+    <Compile Include="TabletBranding.cs"/>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets"/>
 </Project>
