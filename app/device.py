@@ -55,3 +55,32 @@ def show_screen(executable, mode, *, timeout=15, runner=subprocess.run):
     return DeviceStatus(result.returncode == 0,
                         message or ('STU screen updated.' if result.returncode == 0 else 'STU display failed.'),
                         result.returncode)
+
+def validate_signature_png(path):
+    """Reject missing, empty, opaque, or blank bridge output before PDF insertion."""
+    import struct
+    import zlib
+    target = Path(path)
+    if not target.is_file() or target.stat().st_size < 80:
+        raise ValueError("Signature image is missing or empty")
+    data = target.read_bytes()
+    if data[:8] != b"\\x89PNG\\r\\n\\x1a\\n":
+        raise ValueError("Signature output is not a PNG")
+    if data[12:16] != b"IHDR":
+        raise ValueError("Signature PNG is missing its image header")
+    width, height, depth, color_type = struct.unpack(">IIBB", data[16:26])
+    if not (1 <= width <= 4096 and 1 <= height <= 4096):
+        raise ValueError("Signature dimensions are invalid")
+    if depth != 8 or color_type not in (4, 6):
+        raise ValueError("Signature PNG must have an alpha channel")
+    # Decode pixels rather than trusting the PNG header or file size.
+    from PIL import Image
+    with Image.open(target) as image:
+        image.load()
+        rgba = image.convert("RGBA")
+        alpha = rgba.getchannel("A")
+        if alpha.getextrema()[1] == 0:
+            raise ValueError("Signature PNG contains no visible ink")
+        if alpha.getextrema()[0] == 255:
+            raise ValueError("Signature PNG has no transparent background")
+    return target
