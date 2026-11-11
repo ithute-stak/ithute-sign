@@ -39,3 +39,53 @@ jobs:
           } else {
             Write-Host "All required source paths are present (not proof that Windows build or tablet works)."
           }
+
+  tablet-branding:
+    name: Wacom branding bitmap smoke (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile bitmap renderer without vendor SDK
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $source = Get-Content 'wacom-bridge/TabletBranding.cs' -Raw
+          $testSource = @'
+          using System;
+          using System.Drawing;
+          using System.Drawing.Imaging;
+          using IthuteSignWacom;
+          public class Smoke
+          {
+              public static int Main()
+              {
+                  foreach (var mode in new [] { "welcome", "thanks" })
+                  {
+                      using (var image = TabletBranding.Render(mode, 800, 480, null))
+                      {
+                          if (image.Width != 800 || image.Height != 480) return 1;
+                          if (image.GetPixel(10, 10).A != 255) return 2;
+                          image.Save(mode + ".png", ImageFormat.Png);
+                      }
+                  }
+                  try { using (var invalid = TabletBranding.Render("invalid", 800, 480, null)) { } }
+                  catch (ArgumentException) { return 0; }
+                  return 3;
+              }
+          }
+          '@
+          Add-Type -TypeDefinition ($source + [Environment]::NewLine + $testSource) -ReferencedAssemblies @('System.Drawing.dll') -OutputAssembly 'branding-smoke.exe' -OutputType ConsoleApplication
+          & .\branding-smoke.exe
+          if ($LASTEXITCODE -ne 0) { throw "Bitmap renderer smoke failed: $LASTEXITCODE" }
+          foreach ($file in @('welcome.png','thanks.png')) {
+            if (-not (Test-Path $file) -or (Get-Item $file).Length -lt 1000) {
+              throw "Missing or invalid branded screen: $file"
+            }
+          }
+      - name: Upload test bitmap artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ithutesign-tablet-screen-previews
+          path: |
+            welcome.png
+            thanks.png
