@@ -102,7 +102,7 @@ namespace IthuteSignWacom
             var clear = new Button { Text = "Clear", Width = 110 };
             var accept = new Button { Text = "Accept signature", Width = 160 };
             var cancel = new Button { Text = "Cancel", Width = 110 };
-            clear.Click += (s, e) => { ink.Clear(); preview.Invalidate(); };
+            clear.Click += (s, e) => ClearSignature();
             accept.Click += (s, e) => Save();
             cancel.Click += (s, e) => Close();
             buttons.Controls.Add(clear); buttons.Controls.Add(accept); buttons.Controls.Add(cancel);
@@ -240,6 +240,30 @@ namespace IthuteSignWacom
                     else g.FillEllipse(Brushes.DarkBlue, p.X - 1, p.Y - 1, 2, 2);
                     previous = p;
                 }
+            }
+        }
+
+        private void ClearSignature()
+        {
+            // Do not silently erase only the preview if the tablet cannot be cleared.
+            // Keep the current signature intact when the hardware clear fails.
+            if (tablet == null)
+            {
+                MessageBox.Show("Tablet is disconnected. Reconnect before clearing.");
+                return;
+            }
+            try
+            {
+                tablet.setClearScreen();
+                ink.Clear();
+                previousDown = false;
+                preview.Invalidate();
+                connectionStatus.Text = "Signature cleared on tablet and computer — sign again";
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Unable to clear the tablet: " + ex.Message,
+                    "Wacom clear error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
