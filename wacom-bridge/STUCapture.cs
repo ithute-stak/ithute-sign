@@ -73,6 +73,9 @@ namespace IthuteSignWacom
         private readonly Label diagnostics = new Label { Dock = DockStyle.Bottom, Height = 24, Text = "Tablet: connecting... | Pen events: 0 | Contact samples: 0" };
         private int eventCount;
         private int contactCount;
+        private readonly Timer penWatchdog = new Timer { Interval = 10000 };
+        private DateTime connectedAt;
+        private bool penWarningShown;
         private Tablet tablet;
         private ITabletEvents2_onPenDataEventHandler penDataHandler;
         private ICapability capability;
@@ -104,8 +107,19 @@ namespace IthuteSignWacom
             preview.Dock = DockStyle.Fill; preview.BackColor = Color.White;
             preview.Paint += (s, e) => DrawInk(e.Graphics, preview.ClientRectangle, ink);
             Controls.Add(preview); Controls.Add(diagnostics); Controls.Add(connectionBar); Controls.Add(header); Controls.Add(buttons);
+            penWatchdog.Tick += (s, e) => CheckPenStream();
             Shown += (s, e) => Connect();
             FormClosing += (s, e) => Disconnect();
+        }
+
+        private void CheckPenStream()
+        {
+            if (tablet == null) { penWatchdog.Stop(); return; }
+            if (System.Threading.Interlocked.CompareExchange(ref eventCount, 0, 0) == 0 && !penWarningShown && (DateTime.UtcNow - connectedAt).TotalSeconds >= 10)
+            {
+                penWarningShown = true;
+                connectionStatus.Text = "USB connected; no pen reports received — check SDK event stream";
+            }
         }
 
         private void DetectTablet()
@@ -130,6 +144,8 @@ namespace IthuteSignWacom
             Disconnect();
             eventCount = 0;
             contactCount = 0;
+            penWarningShown = false;
+            penWatchdog.Stop();
             ink.Clear();
             preview.Invalidate();
             connectionStatus.Text = "Connecting...";
@@ -150,6 +166,8 @@ namespace IthuteSignWacom
                 tablet.setInkingMode(0x01);
                 diagnostics.Text = "Tablet: connected | Pen events: 0 | Contact samples: 0";
                 connectionStatus.Text = "Connected — waiting for pen input";
+                connectedAt = DateTime.UtcNow;
+                penWatchdog.Start();
             }
             catch (Exception ex)
             {
@@ -176,6 +194,7 @@ namespace IthuteSignWacom
                     ink.Add(new InkSample { X = x, Y = y, Down = down });
                     if (down) contactCount++;
                     connectionStatus.Text = "Connected — receiving pen data";
+                    penWatchdog.Stop();
                     diagnostics.Text = "Tablet: connected | Pen events: " + System.Threading.Interlocked.CompareExchange(ref eventCount, 0, 0) + " | Contact samples: " + contactCount;
                     previousDown = down;
                     preview.Invalidate();
@@ -252,6 +271,7 @@ namespace IthuteSignWacom
 
         private void Disconnect()
         {
+            penWatchdog.Stop();
             if (tablet == null) return;
             try { if (penDataHandler != null) tablet.onPenData -= penDataHandler; } catch { }
             penDataHandler = null;
