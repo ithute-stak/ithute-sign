@@ -233,6 +233,9 @@ class Window(QMainWindow):
         self.height.setRange(15, 180)
         self.height.setValue(65)
         options.addWidget(self.height)
+        self.width.valueChanged.connect(self.resize_selected)
+        self.height.valueChanged.connect(self.resize_selected)
+        self.queue_selection_syncing = False
         options.addStretch()
         layout.addLayout(options)
         content = QHBoxLayout()
@@ -243,6 +246,7 @@ class Window(QMainWindow):
         side = QVBoxLayout()
         side.addWidget(QLabel("Queued signatures"))
         self.queue = QListWidget()
+        self.queue.currentRowChanged.connect(self.select_signature)
         side.addWidget(self.queue)
         content.addLayout(side, 1)
         layout.addLayout(content)
@@ -344,6 +348,37 @@ class Window(QMainWindow):
             self.redraw()
         except Exception as exc:
             QMessageBox.warning(self, "Signature failed", str(exc))
+    def select_signature(self, index):
+        if self.queue_selection_syncing or not (0 <= index < len(self.signatures)):
+            return
+        item = self.signatures[index]
+        self.queue_selection_syncing = True
+        try:
+            self.width.setValue(round(item.width))
+            self.height.setValue(round(item.height))
+        finally:
+            self.queue_selection_syncing = False
+        if self.doc is not None and item.page_index != self.page_index:
+            self.page_index = item.page_index
+        self.redraw()
+
+    def resize_selected(self, unused=None):
+        if self.queue_selection_syncing or self.doc is None:
+            return
+        index = self.queue.currentRow()
+        if not (0 <= index < len(self.signatures)):
+            return
+        item = self.signatures[index]
+        page = self.doc[item.page_index]
+        width, height = self.width.value(), self.height.value()
+        if item.x + width > page.rect.width or item.y + height > page.rect.height:
+            self.status.setText("Resize rejected: signature would extend outside the page")
+            return
+        self.signatures[index] = replace(item, width=width, height=height)
+        self.queue.item(index).setText(
+            f"Page {item.page_index+1} | {width}x{height} pt")
+        self.redraw()
+
     def remove_selected(self):
         index = self.queue.currentRow()
         if index >= 0:
