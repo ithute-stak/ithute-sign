@@ -68,6 +68,8 @@ namespace IthuteSignWacom
         private readonly string destination;
         private readonly List<InkSample> ink = new List<InkSample>();
         private readonly Panel preview = new Panel();
+        private readonly FlowLayoutPanel connectionBar = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 40 };
+        private readonly Label connectionStatus = new Label { AutoSize = true, Text = "Not checked", Padding = new Padding(8, 9, 0, 0) };
         private readonly Label diagnostics = new Label { Dock = DockStyle.Bottom, Height = 24, Text = "Tablet: connecting... | Pen events: 0 | Contact samples: 0" };
         private int eventCount;
         private int contactCount;
@@ -85,6 +87,13 @@ namespace IthuteSignWacom
             var header = new Label { Dock = DockStyle.Top, Height = 42,
                 Text = "Sign on the Wacom tablet. Review your handwriting below." };
             var buttons = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 48 };
+            var detect = new Button { Text = "Detect tablet", Width = 120 };
+            var reconnect = new Button { Text = "Connect / Reconnect", Width = 155 };
+            detect.Click += (s, e) => DetectTablet();
+            reconnect.Click += (s, e) => Connect();
+            connectionBar.Controls.Add(detect);
+            connectionBar.Controls.Add(reconnect);
+            connectionBar.Controls.Add(connectionStatus);
             var clear = new Button { Text = "Clear", Width = 110 };
             var accept = new Button { Text = "Accept signature", Width = 160 };
             var cancel = new Button { Text = "Cancel", Width = 110 };
@@ -94,13 +103,37 @@ namespace IthuteSignWacom
             buttons.Controls.Add(clear); buttons.Controls.Add(accept); buttons.Controls.Add(cancel);
             preview.Dock = DockStyle.Fill; preview.BackColor = Color.White;
             preview.Paint += (s, e) => DrawInk(e.Graphics, preview.ClientRectangle, ink);
-            Controls.Add(preview); Controls.Add(diagnostics); Controls.Add(header); Controls.Add(buttons);
+            Controls.Add(preview); Controls.Add(diagnostics); Controls.Add(connectionBar); Controls.Add(header); Controls.Add(buttons);
             Shown += (s, e) => Connect();
             FormClosing += (s, e) => Disconnect();
         }
 
+        private void DetectTablet()
+        {
+            try
+            {
+                Disconnect();
+                var devices = new UsbDevices();
+                connectionStatus.Text = devices.Count == 0
+                    ? "No Wacom STU device detected"
+                    : "Detected " + devices.Count + " STU device(s) — click Connect";
+                diagnostics.Text = "Tablet: disconnected | Pen events: 0 | Contact samples: 0";
+            }
+            catch (Exception ex)
+            {
+                connectionStatus.Text = "Detection failed: " + ex.Message;
+            }
+        }
+
         private void Connect()
         {
+            Disconnect();
+            eventCount = 0;
+            contactCount = 0;
+            ink.Clear();
+            preview.Invalidate();
+            connectionStatus.Text = "Connecting...";
+
             try
             {
                 var devices = new UsbDevices();
@@ -116,11 +149,13 @@ namespace IthuteSignWacom
                 tablet.onPenData += penDataHandler;
                 tablet.setInkingMode(0x01);
                 diagnostics.Text = "Tablet: connected | Pen events: 0 | Contact samples: 0";
+                connectionStatus.Text = "Connected — waiting for pen input";
             }
             catch (Exception ex)
             {
+                connectionStatus.Text = "Connection failed: " + ex.Message;
+                Disconnect();
                 MessageBox.Show(ex.Message, "Wacom connection error");
-                Close();
             }
         }
 
@@ -140,6 +175,7 @@ namespace IthuteSignWacom
                     // Pen-up is a stroke boundary. Do not connect separate strokes.
                     ink.Add(new InkSample { X = x, Y = y, Down = down });
                     if (down) contactCount++;
+                    connectionStatus.Text = "Connected — receiving pen data";
                     diagnostics.Text = "Tablet: connected | Pen events: " + System.Threading.Interlocked.CompareExchange(ref eventCount, 0, 0) + " | Contact samples: " + contactCount;
                     previousDown = down;
                     preview.Invalidate();
