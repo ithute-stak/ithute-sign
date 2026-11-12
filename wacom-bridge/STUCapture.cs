@@ -68,6 +68,9 @@ namespace IthuteSignWacom
         private readonly string destination;
         private readonly List<InkSample> ink = new List<InkSample>();
         private readonly Panel preview = new Panel();
+        private readonly Label diagnostics = new Label { Dock = DockStyle.Bottom, Height = 24, Text = "Tablet: connecting... | Pen events: 0 | Contact samples: 0" };
+        private int eventCount;
+        private int contactCount;
         private Tablet tablet;
         private ICapability capability;
         private bool previousDown;
@@ -90,7 +93,7 @@ namespace IthuteSignWacom
             buttons.Controls.Add(clear); buttons.Controls.Add(accept); buttons.Controls.Add(cancel);
             preview.Dock = DockStyle.Fill; preview.BackColor = Color.White;
             preview.Paint += (s, e) => DrawInk(e.Graphics, preview.ClientRectangle, ink);
-            Controls.Add(preview); Controls.Add(header); Controls.Add(buttons);
+            Controls.Add(preview); Controls.Add(diagnostics); Controls.Add(header); Controls.Add(buttons);
             Shown += (s, e) => Connect();
             FormClosing += (s, e) => Disconnect();
         }
@@ -109,6 +112,7 @@ namespace IthuteSignWacom
                     throw new InvalidOperationException("Invalid STU tablet capability.");
                 tablet.onPenData += new ITabletEvents2_onPenDataEventHandler(OnPenData);
                 tablet.setInkingMode(0x01);
+                diagnostics.Text = "Tablet: connected | Pen events: 0 | Contact samples: 0";
             }
             catch (Exception ex)
             {
@@ -130,6 +134,9 @@ namespace IthuteSignWacom
                     if (IsDisposed) return;
                     // Pen-up is a stroke boundary. Do not connect separate strokes.
                     ink.Add(new InkSample { X = x, Y = y, Down = down });
+                    eventCount++;
+                    if (down) contactCount++;
+                    diagnostics.Text = "Tablet: connected | Pen events: " + eventCount + " | Contact samples: " + contactCount;
                     previousDown = down;
                     preview.Invalidate();
                 }));
