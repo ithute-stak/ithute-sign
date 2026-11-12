@@ -72,6 +72,7 @@ namespace IthuteSignWacom
         private int eventCount;
         private int contactCount;
         private Tablet tablet;
+        private ITabletEvents2_onPenDataEventHandler penDataHandler;
         private ICapability capability;
         private bool previousDown;
         internal bool Saved { get; private set; }
@@ -110,7 +111,9 @@ namespace IthuteSignWacom
                 capability = tablet.getCapability();
                 if (capability == null || capability.tabletMaxX == 0 || capability.tabletMaxY == 0)
                     throw new InvalidOperationException("Invalid STU tablet capability.");
-                tablet.onPenData += new ITabletEvents2_onPenDataEventHandler(OnPenData);
+                // Keep the COM event delegate rooted for the entire connection lifetime.
+                penDataHandler = new ITabletEvents2_onPenDataEventHandler(OnPenData);
+                tablet.onPenData += penDataHandler;
                 tablet.setInkingMode(0x01);
                 diagnostics.Text = "Tablet: connected | Pen events: 0 | Contact samples: 0";
             }
@@ -123,6 +126,8 @@ namespace IthuteSignWacom
 
         private void OnPenData(IPenData point)
         {
+            // Count callbacks before filtering, so zero means no callbacks reached this handler.
+            System.Threading.Interlocked.Increment(ref eventCount);
             if (capability == null || IsDisposed || !IsHandleCreated) return;
             float x = Math.Max(0f, Math.Min(1f, (float)point.x / capability.tabletMaxX));
             float y = Math.Max(0f, Math.Min(1f, (float)point.y / capability.tabletMaxY));
@@ -134,9 +139,8 @@ namespace IthuteSignWacom
                     if (IsDisposed) return;
                     // Pen-up is a stroke boundary. Do not connect separate strokes.
                     ink.Add(new InkSample { X = x, Y = y, Down = down });
-                    eventCount++;
                     if (down) contactCount++;
-                    diagnostics.Text = "Tablet: connected | Pen events: " + eventCount + " | Contact samples: " + contactCount;
+                    diagnostics.Text = "Tablet: connected | Pen events: " + System.Threading.Interlocked.CompareExchange(ref eventCount, 0, 0) + " | Contact samples: " + contactCount;
                     previousDown = down;
                     preview.Invalidate();
                 }));
@@ -213,6 +217,8 @@ namespace IthuteSignWacom
         private void Disconnect()
         {
             if (tablet == null) return;
+            try { if (penDataHandler != null) tablet.onPenData -= penDataHandler; } catch { }
+            penDataHandler = null;
             try { tablet.setInkingMode(0x00); } catch { }
             try { tablet.disconnect(); } catch { }
             tablet = null;
