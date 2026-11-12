@@ -8,6 +8,7 @@ import tempfile
 import subprocess
 import shutil
 import uuid
+from dataclasses import replace
 from pathlib import Path
 import fitz
 from PySide6.QtCore import Qt, QRectF
@@ -181,8 +182,10 @@ class PageView(QLabel):
         page = self.window.doc[item.page_index]
         x = event.position().x() / self.window.zoom - self.drag_offset[0]
         y = event.position().y() / self.window.zoom - self.drag_offset[1]
-        item.x = max(0, min(x, page.rect.width - item.width))
-        item.y = max(0, min(y, page.rect.height - item.height))
+        self.window.signatures[self.drag_index] = replace(
+            item,
+            x=max(0, min(x, page.rect.width - item.width)),
+            y=max(0, min(y, page.rect.height - item.height)))
         self.window.redraw()
 
     def mouseReleaseEvent(self, event):
@@ -359,8 +362,8 @@ class Window(QMainWindow):
             output += ".pdf"
         answer = QMessageBox.question(
             self, "Confirm signature placement",
-            f"Save {len(self.signatures)} signature(s) into a new PDF?\\n"
-            "Review the page positions and sizes before continuing.\\n"
+            f"Save {len(self.signatures)} signature(s) into a new PDF?\n"
+            "Review the page positions and sizes before continuing.\n"
             "The original document will not be overwritten.",
             QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if answer != QMessageBox.Yes:
