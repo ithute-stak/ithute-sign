@@ -1,0 +1,29 @@
+name: IthuteSign release gate
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+jobs:
+  release-completeness:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reject incomplete Windows source releases
+        shell: pwsh
+        run: |
+          $required = @(
+            'app/main.py',
+            'app/document.py',
+            'wacom-bridge/STUCapture.cs',
+            'wacom-bridge/STUCapture.csproj',
+            'installer/IthuteSign.iss',
+            'build-windows.bat',
+            'build-release.bat'
+          )
+          $missing = @($required | Where-Object { -not (Test-Path $_) })
+          if ($missing.Count -gt 0) {
+            Write-Host "Cannot release IthuteSign: missing required source paths:"
+            $missing | ForEach-Object { Write-Host "  - $_" }
+            exit 1
+          }
+          Write-Host "Release source paths present; Windows compilation and physical STU hardware acceptance are separate requirements."
