@@ -166,6 +166,21 @@ namespace IthuteSignWacom
                 capability = tablet.getCapability();
                 if (capability == null || capability.tabletMaxX == 0 || capability.tabletMaxY == 0)
                     throw new InvalidOperationException("Invalid STU tablet capability.");
+                // STU tablets can remain in TimeCountSequence mode after another application.
+                // In that mode the SDK emits onPenDataTimeCountSequence, not onPenData.
+                // Force basic reports so our existing IPenData callback receives the stream.
+                // Wacom's official DemoButtons sample explicitly handles this mode selection.
+                try
+                {
+                    int mode = tablet.getPenDataOptionMode();
+                    if (mode != (int)penDataOptionMode.PenDataOptionMode_None)
+                        tablet.setPenDataOptionMode((byte)penDataOptionMode.PenDataOptionMode_None);
+                    diagnostics.Text = "Tablet: connected | Basic pen report mode enabled";
+                }
+                catch (System.Runtime.InteropServices.COMException ex)
+                {
+                    diagnostics.Text = "Pen mode configuration unavailable: " + ex.Message;
+                }
                 // Keep the COM event delegate rooted for the entire connection lifetime.
                 penDataHandler = new ITabletEvents2_onPenDataEventHandler(OnPenData);
                 tablet.onPenData += penDataHandler;
