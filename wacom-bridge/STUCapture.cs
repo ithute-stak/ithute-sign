@@ -6,6 +6,7 @@ using System.Drawing.Imaging;
 using System.IO;
 using System.Windows.Forms;
 using wgssSTU;
+using Rectangle = System.Drawing.Rectangle;
 
 namespace IthuteSignWacom
 {
