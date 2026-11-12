@@ -146,16 +146,48 @@ class PageView(QLabel):
     def __init__(self, window):
         super().__init__()
         self.window = window
+        self.drag_index = None
+        self.drag_offset = (0, 0)
         self.setCursor(Qt.CrossCursor)
         self.setStyleSheet("background:white;border:1px solid #bccddd")
+
     def mousePressEvent(self, event):
-        if self.window.doc is not None and event.button() == Qt.LeftButton:
-            x = event.position().x() / self.window.zoom
-            y = event.position().y() / self.window.zoom
-            page = self.window.doc[self.window.page_index]
-            if 0 <= x < page.rect.width and 0 <= y < page.rect.height:
-                self.window.position = (x, y)
-                self.window.redraw()
+        if self.window.doc is None or event.button() != Qt.LeftButton:
+            return
+        x, y = event.position().x() / self.window.zoom, event.position().y() / self.window.zoom
+        page = self.window.doc[self.window.page_index]
+        if not (0 <= x < page.rect.width and 0 <= y < page.rect.height):
+            return
+        # Prefer moving an existing signature over creating a new placement.
+        for i in range(len(self.window.signatures) - 1, -1, -1):
+            item = self.window.signatures[i]
+            if (item.page_index == self.window.page_index and
+                item.x <= x <= item.x + item.width and
+                item.y <= y <= item.y + item.height):
+                self.drag_index = i
+                self.drag_offset = (x - item.x, y - item.y)
+                self.window.queue.setCurrentRow(i)
+                self.setCursor(Qt.ClosedHandCursor)
+                return
+        self.window.position = (x, y)
+        self.window.redraw()
+
+    def mouseMoveEvent(self, event):
+        if self.drag_index is None or self.window.doc is None:
+            return
+        if not (event.buttons() & Qt.LeftButton):
+            return
+        item = self.window.signatures[self.drag_index]
+        page = self.window.doc[item.page_index]
+        x = event.position().x() / self.window.zoom - self.drag_offset[0]
+        y = event.position().y() / self.window.zoom - self.drag_offset[1]
+        item.x = max(0, min(x, page.rect.width - item.width))
+        item.y = max(0, min(y, page.rect.height - item.height))
+        self.window.redraw()
+
+    def mouseReleaseEvent(self, event):
+        self.drag_index = None
+        self.setCursor(Qt.CrossCursor)
 
 class Window(QMainWindow):
     def __init__(self):
@@ -211,7 +243,7 @@ class Window(QMainWindow):
         side.addWidget(self.queue)
         content.addLayout(side, 1)
         layout.addLayout(content)
-        self.status = QLabel("Connect STU-540. Open a document to begin.")
+        self.status = QLabel("Connect STU-540. Open a document to begin. Drag existing signatures to reposition them.")
         layout.addWidget(self.status)
         from PySide6.QtCore import QTimer
         QTimer.singleShot(300, self.welcome)
@@ -325,6 +357,14 @@ class Window(QMainWindow):
             return
         if not output.lower().endswith(".pdf"):
             output += ".pdf"
+        answer = QMessageBox.question(
+            self, "Confirm signature placement",
+            f"Save {len(self.signatures)} signature(s) into a new PDF?\\n"
+            "Review the page positions and sizes before continuing.\\n"
+            "The original document will not be overwritten.",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if answer != QMessageBox.Yes:
+            return
         try:
             audit = sign_pdf_many(self.preview_pdf, self.signatures, output,
                                   source_document=self.source)
