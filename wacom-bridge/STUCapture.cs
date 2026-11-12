@@ -134,8 +134,7 @@ namespace IthuteSignWacom
                     preview.Invalidate();
                 }));
             }
-            catch (InvalidOperationException) { }
-            catch (ObjectDisposedException) { }
+            catch (InvalidOperationException) { } // Includes ObjectDisposedException
         }
 
         private static void DrawInk(Graphics g, Rectangle rect, IList<InkSample> samples)
