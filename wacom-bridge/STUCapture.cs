@@ -76,6 +76,8 @@ namespace IthuteSignWacom
         private readonly Timer penWatchdog = new Timer { Interval = 10000 };
         private DateTime connectedAt;
         private bool penWarningShown;
+        private readonly Label rawEventStatus = new Label { Dock = DockStyle.Bottom, Height = 24, Text = "Raw callbacks: 0 | Last callback: never" };
+        private DateTime lastRawCallback;
         private Tablet tablet;
         private ITabletEvents2_onPenDataEventHandler penDataHandler;
         private ICapability capability;
@@ -106,7 +108,8 @@ namespace IthuteSignWacom
             buttons.Controls.Add(clear); buttons.Controls.Add(accept); buttons.Controls.Add(cancel);
             preview.Dock = DockStyle.Fill; preview.BackColor = Color.White;
             preview.Paint += (s, e) => DrawInk(e.Graphics, preview.ClientRectangle, ink);
-            Controls.Add(preview); Controls.Add(diagnostics); Controls.Add(connectionBar); Controls.Add(header); Controls.Add(buttons);
+            Controls.Add(preview); Controls.Add(rawEventStatus); Controls.Add(diagnostics); Controls.Add(connectionBar); Controls.Add(header); Controls.Add(buttons);
+            penWatchdog.Interval = 1000;
             penWatchdog.Tick += (s, e) => CheckPenStream();
             Shown += (s, e) => Connect();
             FormClosing += (s, e) => Disconnect();
@@ -115,6 +118,7 @@ namespace IthuteSignWacom
         private void CheckPenStream()
         {
             if (tablet == null) { penWatchdog.Stop(); return; }
+            rawEventStatus.Text = "Raw callbacks: " + System.Threading.Interlocked.CompareExchange(ref eventCount, 0, 0) + " | Last callback: " + (lastRawCallback == default(DateTime) ? "never" : lastRawCallback.ToLocalTime().ToString("HH:mm:ss"));
             if (System.Threading.Interlocked.CompareExchange(ref eventCount, 0, 0) == 0 && !penWarningShown && (DateTime.UtcNow - connectedAt).TotalSeconds >= 10)
             {
                 penWarningShown = true;
@@ -145,6 +149,8 @@ namespace IthuteSignWacom
             eventCount = 0;
             contactCount = 0;
             penWarningShown = false;
+            lastRawCallback = default(DateTime);
+            rawEventStatus.Text = "Raw callbacks: 0 | Last callback: never";
             penWatchdog.Stop();
             ink.Clear();
             preview.Invalidate();
@@ -181,6 +187,7 @@ namespace IthuteSignWacom
         {
             // Count callbacks before filtering, so zero means no callbacks reached this handler.
             System.Threading.Interlocked.Increment(ref eventCount);
+            lastRawCallback = DateTime.UtcNow;
             if (capability == null || IsDisposed || !IsHandleCreated) return;
             float x = Math.Max(0f, Math.Min(1f, (float)point.x / capability.tabletMaxX));
             float y = Math.Max(0f, Math.Min(1f, (float)point.y / capability.tabletMaxY));
@@ -194,7 +201,7 @@ namespace IthuteSignWacom
                     ink.Add(new InkSample { X = x, Y = y, Down = down });
                     if (down) contactCount++;
                     connectionStatus.Text = "Connected — receiving pen data";
-                    penWatchdog.Stop();
+                    // Keep the watchdog active to show raw callback health.
                     diagnostics.Text = "Tablet: connected | Pen events: " + System.Threading.Interlocked.CompareExchange(ref eventCount, 0, 0) + " | Contact samples: " + contactCount;
                     previousDown = down;
                     preview.Invalidate();
