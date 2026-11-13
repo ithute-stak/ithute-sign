@@ -68,6 +68,13 @@
                             <TextBox x:Name="ContractReference" Header="Client National ID" PlaceholderText="Enter the client National ID exactly as registered in LoanHub" />
                             <Button Content="Check unsigned-document search readiness" Click="ContractPreflight_Click" HorizontalAlignment="Left" />
                             <TextBlock x:Name="ContractPreflightStatus" Text="No client documents loaded. Signing disabled." TextWrapping="Wrap" />
+                            <TextBlock Text="Unsigned contracts" FontSize="16" FontWeight="SemiBold" />
+                            <TextBlock Text="Documents appear only after the enrolled workstation supplies an authorized bridge session. No document may be signed from this list yet." TextWrapping="Wrap" Opacity="0.7" />
+                            <ListView x:Name="UnsignedContractsList" Height="180" SelectionMode="None"
+                                      IsEnabled="False" />
+                            <TextBlock x:Name="UnsignedContractsStatus"
+                                       Text="No authorized contract lookup has completed."
+                                       TextWrapping="Wrap" />
                         </StackPanel>
                     </Border>
                     <!-- Legacy arbitrary-file workflow is not part of LoanHub signing. -->
