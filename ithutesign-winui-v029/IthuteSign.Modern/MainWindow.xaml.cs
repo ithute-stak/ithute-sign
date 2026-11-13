@@ -89,7 +89,7 @@ public sealed partial class MainWindow : Window
             LoanHubLoginStatus.Text = "Connecting to LoanHub...";
             _loanHubSession?.Dispose();
             _loanHubSession = null;
-            var session = new LoanHubSession(new Uri(LoanHubUrl.Text.Trim(), UriKind.Absolute));
+            var session = new LoanHubSession(new Uri("https://api.loanhub.co.ls/", UriKind.Absolute));
             try
             {
                 var user = await session.LoginAsync(
