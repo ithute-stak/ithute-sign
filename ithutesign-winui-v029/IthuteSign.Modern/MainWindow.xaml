@@ -64,12 +64,13 @@
                     <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="14" Padding="20">
                         <StackPanel Spacing="10">
                             <TextBlock Text="LoanHub contract workspace — authorization preflight" FontSize="20" FontWeight="SemiBold" />
-                            <TextBlock Text="Find unsigned loan documents by client National ID, scoped to your authorized company. Retrieval and signing remain disabled until LoanHub confirms the API and document permissions." TextWrapping="Wrap" />
+                            <TextBlock Text="Find eligible unsigned contracts by National ID inside the verified LoanHub workstation desk. The local connector holds the device proof and bridge session; this standalone preflight does not retrieve or sign contracts." TextWrapping="Wrap" />
                             <TextBox x:Name="ContractReference" Header="Client National ID" PlaceholderText="Enter the client National ID exactly as registered in LoanHub" />
                             <Button Content="Check unsigned-document search readiness" Click="ContractPreflight_Click" HorizontalAlignment="Left" />
+                            <Button Content="Open verified unsigned-contract picker" Click="OpenEmbeddedWorkstationDesk_Click" HorizontalAlignment="Left" />
                             <TextBlock x:Name="ContractPreflightStatus" Text="No client documents loaded. Signing disabled." TextWrapping="Wrap" />
                             <TextBlock Text="Unsigned contracts" FontSize="16" FontWeight="SemiBold" />
-                            <TextBlock Text="Documents appear only after the enrolled workstation supplies an authorized bridge session. No document may be signed from this list yet." TextWrapping="Wrap" Opacity="0.7" />
+                            <TextBlock Text="The secure contract picker runs in the embedded workstation desk above. This native list remains disabled until an authenticated, non-secret integration is implemented." TextWrapping="Wrap" Opacity="0.7" />
                             <ListView x:Name="UnsignedContractsList" Height="180" SelectionMode="None"
                                       IsEnabled="False" />
                             <TextBlock x:Name="UnsignedContractsStatus"
