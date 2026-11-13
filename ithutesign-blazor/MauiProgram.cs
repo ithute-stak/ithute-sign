@@ -1,3 +1,6 @@
+using Microsoft.Maui.Hosting;
+using Microsoft.Maui.Controls.Hosting;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 namespace IthuteSign.Blazor;
 public static class MauiProgram
