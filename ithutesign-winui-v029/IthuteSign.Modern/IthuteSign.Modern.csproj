@@ -19,4 +19,16 @@
     <ApplicationDefinition Include="App.xaml" />
     <Page Include="MainWindow.xaml" />
   </ItemGroup>
+  <!-- A release must provide the tested x86 Wacom bridge and its SDK interop
+       dependencies together. Missing release payload fails the build. -->
+  <PropertyGroup>
+    <WacomCapturePayload Condition="'$(WacomCapturePayload)' == ''">$(MSBuildProjectDirectory)\..\..\ithute-sign\wacom-bridge\bin</WacomCapturePayload>
+  </PropertyGroup>
+  <Target Name="BundleWacomCapture" AfterTargets="Build" Condition="'$(BundleWacomCapture)' == 'true'">
+    <Error Condition="!Exists('$(WacomCapturePayload)\STUCapture.exe')" Text="Wacom capture payload missing: build and test the x86 bridge before packaging." />
+    <ItemGroup>
+      <WacomPayloadFiles Include="$(WacomCapturePayload)\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(WacomPayloadFiles)" DestinationFiles="@(WacomPayloadFiles->'$(TargetDir)wacom-bridge\%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
+  </Target>
 </Project>
