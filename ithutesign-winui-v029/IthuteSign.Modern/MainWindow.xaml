@@ -22,7 +22,7 @@
                     <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="14" Padding="20">
                         <StackPanel Spacing="10">
                             <TextBlock Text="LoanHub employee and workstation access" FontSize="20" FontWeight="SemiBold" />
-                            <TextBox x:Name="LoanHubUrl" Header="LoanHub HTTPS address" Text="https://ithute.co.ls/" />
+                            <TextBox x:Name="LoanHubUrl" Header="LoanHub HTTPS address" Text="https://api.loanhub.co.ls/" />
                             <TextBox x:Name="LoanHubPhone" Header="Phone number" />
                             <PasswordBox x:Name="LoanHubPassword" Header="Password" />
                             <PasswordBox x:Name="LoanHubOtp" Header="OTP (when required)" />
