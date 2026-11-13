@@ -110,6 +110,7 @@ public sealed class LoanHubSession : IDisposable
             Content = JsonContent.Create(new { workstation_id = workstationId })
         };
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _token);
+        request.Headers.Add("X-Company-ID", CompanyId?.ToString("D") ?? throw new UnauthorizedAccessException("Company context unavailable."));
         using var response = await _http.SendAsync(request, cancellationToken);
         if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
         {
