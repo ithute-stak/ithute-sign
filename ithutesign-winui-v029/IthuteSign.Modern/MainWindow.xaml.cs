@@ -111,6 +111,63 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private bool _embeddedDeskReady;
+
+    private async void OpenEmbeddedWorkstationDesk_Click(object sender, RoutedEventArgs e)
+    {
+        // The existing Go connector owns the browser session, CSRF protection,
+        // employee login, workstation private key, and Wacom SDK operations.
+        // No WinUI credentials or bearer tokens are forwarded to localhost.
+        try
+        {
+            using var handler = new HttpClientHandler
+            {
+                AllowAutoRedirect = false, UseCookies = false, UseProxy = false
+            };
+            using var http = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(3) };
+            using var request = new HttpRequestMessage(HttpMethod.Get, "http://127.0.0.1:8767/");
+            using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+            if (response.StatusCode != System.Net.HttpStatusCode.OK ||
+                !string.Equals(response.Content.Headers.ContentType?.MediaType, "text/html",
+                    StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Approved local connector is unavailable.");
+
+            await EmbeddedDesk.EnsureCoreWebView2Async();
+            if (!_embeddedDeskReady)
+            {
+                EmbeddedDesk.CoreWebView2.NewWindowRequested += (_, args) => args.Handled = true;
+                EmbeddedDesk.CoreWebView2.DownloadStarting += (_, args) => args.Cancel = true;
+                EmbeddedDesk.CoreWebView2.PermissionRequested += (_, args) =>
+                    args.State = CoreWebView2PermissionState.Deny;
+                EmbeddedDesk.CoreWebView2.Settings.AreDevToolsEnabled = false;
+                EmbeddedDesk.CoreWebView2.Settings.AreHostObjectsAllowed = false;
+                EmbeddedDesk.CoreWebView2.Settings.IsWebMessageEnabled = false;
+                _embeddedDeskReady = true;
+            }
+            EmbeddedDeskPanel.Visibility = Visibility.Visible;
+            EmbeddedDesk.Source = new Uri("http://127.0.0.1:8767/");
+            EmbeddedDeskStatus.Text =
+                "LoanHub connector desk opened locally. Sign in inside this desk and complete enrolled-device verification. Evidence review is not contract signing.";
+        }
+        catch (Exception ex)
+        {
+            EmbeddedDeskPanel.Visibility = Visibility.Collapsed;
+            EmbeddedDeskStatus.Text = "Local signing desk unavailable. Signing disabled.";
+            ShowError("Start the approved Go Wacom connector with --pc-ui and enrolled workstation keys. " + ex.Message);
+        }
+    }
+
+    private void EmbeddedDesk_NavigationStarting(WebView2 sender, CoreWebView2NavigationStartingEventArgs args)
+    {
+        // Block navigation to any external site, loopback aliases, or other ports.
+        // The embedded page uses the Go connector's existing cookie and CSRF session.
+        if (!Uri.TryCreate(args.Uri, UriKind.Absolute, out var target) ||
+            target.Scheme != Uri.UriSchemeHttp ||
+            target.Host != "127.0.0.1" || target.Port != 8767 ||
+            !string.IsNullOrEmpty(target.UserInfo) || !string.IsNullOrEmpty(target.Fragment))
+            args.Cancel = true;
+    }
+
     private void OpenLocalWorkstationDesk_Click(object sender, RoutedEventArgs e)
     {
         // Fixed loopback address only. Do not forward the WinUI bearer token,
