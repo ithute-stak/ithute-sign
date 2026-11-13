@@ -17,4 +17,15 @@ public partial class App : Application
         MainPage = new MainPage();
         StartupTrace.Write("MainPage assigned");
     }
+    protected override Window CreateWindow(IActivationState? activationState)
+    {
+        StartupTrace.Write("CreateWindow entered");
+        var window = base.CreateWindow(activationState);
+        StartupTrace.Write("CreateWindow returned window");
+        window.Created += (_, _) => StartupTrace.Write("Window Created");
+        window.Activated += (_, _) => StartupTrace.Write("Window Activated");
+        window.Deactivated += (_, _) => StartupTrace.Write("Window Deactivated");
+        window.Destroying += (_, _) => StartupTrace.Write("Window Destroying");
+        return window;
+    }
 }
