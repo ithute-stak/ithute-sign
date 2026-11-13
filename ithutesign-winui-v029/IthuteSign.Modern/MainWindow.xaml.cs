@@ -221,6 +221,65 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private Process? _ownedWorkstationDesk;
+
+    private async Task EnsureWorkstationDeskRunningAsync()
+    {
+        // Only start a connector shipped with the application; never execute a
+        // user-supplied path or pass credentials through process arguments.
+        var executable = Path.Combine(AppContext.BaseDirectory, "wacom-connector",
+            "loanhub-wacom-connector.exe");
+        if (!File.Exists(executable))
+            return; // Existing installed connector may already be running.
+
+        using var handler = new HttpClientHandler
+        {
+            AllowAutoRedirect = false, UseCookies = false, UseProxy = false
+        };
+        using var http = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(2) };
+        try
+        {
+            using var response = await http.GetAsync("http://127.0.0.1:8767/",
+                HttpCompletionOption.ResponseHeadersRead);
+            if (response.IsSuccessStatusCode)
+                return;
+        }
+        catch (HttpRequestException) { }
+        catch (TaskCanceledException) { }
+
+        if (_ownedWorkstationDesk is { HasExited: false })
+            return;
+        var start = new ProcessStartInfo(executable)
+        {
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            WorkingDirectory = Path.GetDirectoryName(executable)!
+        };
+        start.ArgumentList.Add("--pc-ui");
+        start.ArgumentList.Add("--loanhub-origin=https://api.loanhub.co.ls");
+        _ownedWorkstationDesk = Process.Start(start)
+            ?? throw new InvalidOperationException("Packaged workstation desk could not start.");
+        // Startup is asynchronous. Readiness is checked independently below;
+        // process launch never means workstation authorization or signing success.
+        for (var attempt = 0; attempt < 12; attempt++)
+        {
+            await Task.Delay(250);
+            if (_ownedWorkstationDesk.HasExited)
+                throw new InvalidOperationException("Workstation desk exited during startup.");
+            try
+            {
+                using var response = await http.GetAsync("http://127.0.0.1:8767/",
+                    HttpCompletionOption.ResponseHeadersRead);
+                if (response.StatusCode == System.Net.HttpStatusCode.OK &&
+                    response.Content.Headers.ContentType?.MediaType == "text/html")
+                    return;
+            }
+            catch (HttpRequestException) { }
+            catch (TaskCanceledException) { }
+        }
+        throw new InvalidOperationException("Workstation desk did not become ready.");
+    }
+
     private bool _embeddedDeskReady;
 
     private async void OpenEmbeddedWorkstationDesk_Click(object sender, RoutedEventArgs e)
@@ -230,6 +289,7 @@ public sealed partial class MainWindow : Window
         // No WinUI credentials or bearer tokens are forwarded to localhost.
         try
         {
+            await EnsureWorkstationDeskRunningAsync();
             using var handler = new HttpClientHandler
             {
                 AllowAutoRedirect = false, UseCookies = false, UseProxy = false
