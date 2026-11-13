@@ -104,6 +104,7 @@ public sealed class LoanHubSession : IDisposable
             cancellationToken: cancellationToken);
         if (challenge is null || challenge.ChallengeId == Guid.Empty
             || challenge.WorkstationId != workstationId
+            || challenge.CompanyId == Guid.Empty || challenge.EmployeeUserId != User?.Id
             || string.IsNullOrWhiteSpace(challenge.Nonce)
             || challenge.ExpiresAt <= DateTimeOffset.UtcNow
             || !challenge.DeviceProofRequired || challenge.SigningAuthorized)
@@ -148,6 +149,8 @@ public sealed class DeviceChallenge
 {
     [JsonPropertyName("challenge_id")] public Guid ChallengeId { get; set; }
     [JsonPropertyName("workstation_id")] public Guid WorkstationId { get; set; }
+    [JsonPropertyName("company_id")] public Guid CompanyId { get; set; }
+    [JsonPropertyName("employee_user_id")] public Guid EmployeeUserId { get; set; }
     [JsonPropertyName("nonce")] public string? Nonce { get; set; }
     [JsonPropertyName("expires_at")] public DateTimeOffset ExpiresAt { get; set; }
     [JsonPropertyName("device_proof_required")] public bool DeviceProofRequired { get; set; }
