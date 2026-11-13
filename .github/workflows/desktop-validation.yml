@@ -7,15 +7,18 @@ on:
 jobs:
   winui-build:
     runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: ithutesign-winui-v029
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
       - name: Restore WinUI
-        run: dotnet restore ithutesign-winui-v029/IthuteSign.Modern/IthuteSign.Modern.csproj -p:Platform=x64
+        run: dotnet restore IthuteSign.Modern/IthuteSign.Modern.csproj -p:Platform=x64
       - name: Build WinUI
-        run: dotnet build ithutesign-winui-v029/IthuteSign.Modern/IthuteSign.Modern.csproj --no-restore -c Release -p:Platform=x64
+        run: dotnet build IthuteSign.Modern/IthuteSign.Modern.csproj --no-restore -c Release -p:Platform=x64
   python-syntax:
     runs-on: windows-latest
     steps:
