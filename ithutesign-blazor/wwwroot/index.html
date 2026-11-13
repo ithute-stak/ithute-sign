@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>IthuteSign</title>
+<link href="styles.css" rel="stylesheet">
+<style>
+#startup-diagnostic{display:none;margin:24px;padding:18px;background:#fff1f2;color:#9f1239;border:1px solid #fecdd3;border-radius:10px;white-space:pre-wrap;font:13px/1.5 Consolas,monospace}
+#blazor-error-ui{display:none;position:fixed;bottom:0;left:0;right:0;padding:16px 24px;background:#fff1f2;color:#9f1239;z-index:9999}
+</style>
+<script>
+window.addEventListener('error',function(e){
+ var d=document.getElementById('startup-diagnostic');
+ if(d){d.style.display='block';d.textContent='WebView error: '+(e.message||'unknown error');}
+});
+window.addEventListener('unhandledrejection',function(e){
+ var d=document.getElementById('startup-diagnostic');
+ if(d){d.style.display='block';d.textContent='Blazor startup error: '+String(e.reason||'unknown error');}
+});
+</script>
+</head>
+<body>
+<div id="app"><div style="padding:32px;font-family:Segoe UI,Arial,sans-serif;color:#24364e">Starting IthuteSign…</div></div>
+<div id="startup-diagnostic" role="alert"></div>
+<div id="blazor-error-ui" role="alert">IthuteSign encountered a Blazor rendering error. Please send a screenshot of this message and the Visual Studio debug output. <a href="" style="margin-left:12px">Reload</a></div>
+<script src="_framework/blazor.webview.js"></script>
+</body>
+</html>
