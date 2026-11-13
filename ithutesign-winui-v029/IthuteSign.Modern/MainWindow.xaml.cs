@@ -12,6 +12,47 @@ namespace IthuteSign.Modern;
 public sealed partial class MainWindow : Window
 {
     private readonly List<string> _recent = new();
+    private LoanHubSession? _loanHubSession;
+
+    private async void LoanHubLogin_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            LoanHubLoginStatus.Text = "Connecting to LoanHub...";
+            _loanHubSession?.Dispose();
+            _loanHubSession = null;
+            var session = new LoanHubSession(new Uri(LoanHubUrl.Text.Trim(), UriKind.Absolute));
+            try
+            {
+                var user = await session.LoginAsync(
+                    LoanHubPhone.Text, LoanHubPassword.Password, LoanHubOtp.Password);
+                _loanHubSession = session;
+                LoanHubLoginStatus.Text =
+                    $"Authenticated: {user.Phone}. Signing requires separate workstation and document authorization.";
+            }
+            finally
+            {
+                LoanHubPassword.Password = "";
+                LoanHubOtp.Password = "";
+                if (_loanHubSession != session) session.Dispose();
+            }
+        }
+        catch (Exception ex)
+        {
+            LoanHubLoginStatus.Text = "Not connected.";
+            ShowError("LoanHub login failed: " + ex.Message);
+        }
+    }
+
+    private void LoanHubLogout_Click(object sender, RoutedEventArgs e)
+    {
+        _loanHubSession?.Dispose();
+        _loanHubSession = null;
+        LoanHubPassword.Password = "";
+        LoanHubOtp.Password = "";
+        LoanHubLoginStatus.Text = "Logged out. LoanHub signing is unavailable.";
+    }
+
     private string? _selectedPath;
     private bool _previewReady;
     private readonly string _settingsPath = Path.Combine(
