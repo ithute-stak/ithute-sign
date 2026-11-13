@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+# Build
+build/
+dist/
+*.spec
+# External Wacom SDK and vendor installers
+*.exe
+*.msi
+*.dll
+*.zip
+# Private signing data
+*.pdf
+*.doc
+*.docx
+*.png
