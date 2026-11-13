@@ -92,6 +92,9 @@ public sealed partial class MainWindow : Window
         try
         {
             var challenge = await _loanHubSession.RequestDeviceChallengeAsync(workstationId);
+            // Ensure our transcript exactly matches LoanHub's proof protocol.
+            // Signing and submission must be done by the enrolled local bridge.
+            _ = DeviceProofMessage.Create(challenge, challenge.CompanyId, challenge.EmployeeUserId);
             // Do not expose nonce or credentials in UI/logs. The enrolled
             // workstation bridge must sign and submit proof in a later phase.
             DeviceChallengeStatus.Text =
