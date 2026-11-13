@@ -11,9 +11,7 @@
            BackgroundColor="#10223E" TextColor="White"
            Padding="16,10" FontSize="13" />
     <blazor:BlazorWebView Grid.Row="1" x:Name="WorkspaceWebView"
-                         HostPage="wwwroot/index.html"
-                         BlazorWebViewInitialized="OnWebViewInitialized"
-                         BlazorWebViewInitializing="OnWebViewInitializing">
+                         HostPage="wwwroot/index.html">
       <blazor:BlazorWebView.RootComponents>
         <blazor:RootComponent Selector="#app" ComponentType="{x:Type local:AppRoot}" />
       </blazor:BlazorWebView.RootComponents>
