@@ -53,6 +53,14 @@
                         <TextBlock Text="Welcome to IthuteSign" FontSize="32" FontWeight="SemiBold" />
                         <TextBlock Text="Authenticated LoanHub contract review and Wacom evidence capture" Opacity="0.72" FontSize="15" />
                     </StackPanel>
+                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="14" Padding="20">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="Wacom STU-540 hardware test" FontSize="20" FontWeight="SemiBold" />
+                            <TextBlock Text="Test signature capture locally. This diagnostic does not sign a LoanHub contract or upload evidence." TextWrapping="Wrap" />
+                            <Button Content="Test Wacom STU-540" Click="TestWacom_Click" HorizontalAlignment="Left" />
+                            <TextBlock x:Name="WacomDiagnosticStatus" Text="Hardware test has not been started." TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
                     <!-- Legacy arbitrary-file workflow is not part of LoanHub signing. -->
                     <StackPanel Visibility="Collapsed">
                     <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
