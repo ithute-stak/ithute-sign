@@ -26,9 +26,10 @@ public sealed partial class MainWindow : Window
             {
                 var user = await session.LoginAsync(
                     LoanHubPhone.Text, LoanHubPassword.Password, LoanHubOtp.Password);
+                var companyName = await session.GetCompanyNameAsync();
                 _loanHubSession = session;
                 LoanHubLoginStatus.Text =
-                    $"Authenticated: {user.Phone}. Signing requires separate workstation and document authorization.";
+                    $"Authenticated: {user.Phone} | Company: {companyName}. Signing requires separate workstation and document authorization.";
             }
             finally
             {
