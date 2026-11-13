@@ -20,19 +20,22 @@ public sealed partial class MainWindow : Window
         // Hardware diagnostics only. No LoanHub contract authorization or signed-status changes.
         try
         {
+            // Prefer the capture executable shipped alongside IthuteSign. Development
+            // and machine-wide installations remain supported as fallbacks.
             var candidates = new[]
             {
-                Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..",
-                    "ithute-sign", "wacom-bridge", "bin", "STUCapture.exe")),
+                Path.Combine(AppContext.BaseDirectory, "wacom-bridge", "STUCapture.exe"),
+                Path.Combine(AppContext.BaseDirectory, "STUCapture.exe"),
                 Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
                     "IthuteSign", "wacom-bridge", "STUCapture.exe"),
-                @"C:\ithute-sign-moden\ithute-sign\wacom-bridge\bin\STUCapture.exe"
+                Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..",
+                    "ithute-sign", "wacom-bridge", "bin", "STUCapture.exe"))
             };
             var exe = candidates.FirstOrDefault(File.Exists);
             if (exe is null)
             {
                 WacomDiagnosticStatus.Text = "Wacom capture bridge not found.";
-                ShowError("Build ithute-sign/wacom-bridge/STUCapture.csproj, then restart IthuteSign Modern.");
+                ShowError("The Wacom capture component is missing. Reinstall IthuteSign with its Wacom bridge, or build the bridge for development.");
                 return;
             }
             var folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
