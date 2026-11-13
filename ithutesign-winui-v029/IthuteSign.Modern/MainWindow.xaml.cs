@@ -14,6 +14,53 @@ public sealed partial class MainWindow : Window
     private readonly List<string> _recent = new();
     private LoanHubSession? _loanHubSession;
 
+    private async void TestWacom_Click(object sender, RoutedEventArgs e)
+    {
+        // Hardware diagnostics only. No LoanHub contract authorization or signed-status changes.
+        try
+        {
+            var candidates = new[]
+            {
+                Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..",
+                    "ithute-sign", "wacom-bridge", "bin", "STUCapture.exe")),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                    "IthuteSign", "wacom-bridge", "STUCapture.exe"),
+                @"C:\ithute-sign-moden\ithute-sign\wacom-bridge\bin\STUCapture.exe"
+            };
+            var exe = candidates.FirstOrDefault(File.Exists);
+            if (exe is null)
+            {
+                WacomDiagnosticStatus.Text = "Wacom capture bridge not found.";
+                ShowError("Build ithute-sign/wacom-bridge/STUCapture.csproj, then restart IthuteSign Modern.");
+                return;
+            }
+            var folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "IthuteSign", "diagnostics");
+            Directory.CreateDirectory(folder);
+            var output = Path.Combine(folder, "wacom-test-" + Guid.NewGuid().ToString("N") + ".png");
+            var start = new ProcessStartInfo(exe)
+            {
+                UseShellExecute = false,
+                WorkingDirectory = Path.GetDirectoryName(exe)!
+            };
+            start.ArgumentList.Add(output);
+            WacomDiagnosticStatus.Text = "Waiting for Wacom test capture...";
+            using var process = Process.Start(start)
+                ?? throw new InvalidOperationException("Wacom capture process could not start.");
+            await process.WaitForExitAsync();
+            if (process.ExitCode == 0 && File.Exists(output) && new FileInfo(output).Length > 0)
+                WacomDiagnosticStatus.Text = "Hardware test saved locally: " + output
+                    + " (not a signed LoanHub contract).";
+            else
+                WacomDiagnosticStatus.Text = "Hardware test cancelled or failed. No LoanHub contract was changed.";
+        }
+        catch (Exception ex)
+        {
+            WacomDiagnosticStatus.Text = "Hardware test failed.";
+            ShowError("Wacom diagnostic: " + ex.Message);
+        }
+    }
+
     private async void LoanHubLogin_Click(object sender, RoutedEventArgs e)
     {
         try
