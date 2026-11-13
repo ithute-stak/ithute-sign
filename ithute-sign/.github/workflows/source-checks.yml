@@ -1,0 +1,68 @@
+name: IthuteSign source checks
+on:
+  push:
+    branches: [main, import-ithutesign-v0.12]
+  pull_request:
+    branches: [main]
+jobs:
+  python-tests:
+    name: Source unit tests (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install PDF engine for document tests
+        run: python -m pip install "PyMuPDF>=1.24,<2"
+      - name: Compile Python source files
+        shell: pwsh
+        run: python -m compileall -q app tests
+      - name: Run offline unit tests
+        shell: pwsh
+        run: python -m unittest discover -s tests -v
+      - name: Report import progress (not a release approval)
+        shell: pwsh
+        run: |
+          $required = @(
+            'app/main.py',
+            'app/document.py',
+            'wacom-bridge/STUCapture.cs',
+            'wacom-bridge/STUCapture.csproj',
+            'installer/IthuteSign.iss',
+            'build-release.bat'
+          )
+          $missing = @($required | Where-Object { -not (Test-Path $_) })
+          if ($missing.Count -gt 0) {
+            Write-Host "::warning::IthuteSign is not release-ready: missing $($missing.Count) required source files"
+            $missing | ForEach-Object { Write-Host "  - $_" }
+          } else {
+            Write-Host "All required source paths are present (not proof that Windows build or tablet works)."
+          }
+
+  tablet-branding:
+    name: Wacom branding bitmap smoke (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: microsoft/setup-msbuild@v2
+      - name: Compile and run standalone branding test
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & msbuild 'tests/branding/BrandingSmoke.csproj' /t:Build /p:Configuration=Release /verbosity:minimal
+          if ($LASTEXITCODE -ne 0) { throw "MSBuild failed: $LASTEXITCODE" }
+          & 'tests/branding/bin/BrandingSmoke.exe'
+          if ($LASTEXITCODE -ne 0) { throw "Bitmap renderer smoke failed: $LASTEXITCODE" }
+          foreach ($file in @('welcome.png','thanks.png')) {
+            if (-not (Test-Path $file) -or (Get-Item $file).Length -lt 1000) {
+              throw "Missing or invalid branded screen: $file"
+            }
+          }
+      - name: Upload test bitmap artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ithutesign-tablet-screen-previews
+          path: |
+            welcome.png
+            thanks.png
