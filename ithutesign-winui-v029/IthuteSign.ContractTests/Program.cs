@@ -71,6 +71,47 @@ await Reject(async () => await new LoanHubDocumentConsentClient(http)
 await Reject(async () => await new LoanHubDocumentIntentClient(http)
     .PrepareAsync(contracts[0], company, workstation, "", "wb1_test"), "missing token rejected");
 Assert(calls == 4, "invalid requests rejected before network");
+
+// Negative cases must fail closed even when the server returns HTTP 200.
+using var tamperedPdfHttp = new HttpClient(new FakeHandler(_ => {
+    var response = new HttpResponseMessage(HttpStatusCode.OK) {
+        Content = new ByteArrayContent(Encoding.ASCII.GetBytes("%PDF-1.7\\nTAMPERED\\n%%EOF")) };
+    response.Content.Headers.ContentType = new("application/pdf");
+    response.Headers.Add("X-Wacom-Original-SHA256", sha);
+    response.Headers.Add("X-Wacom-Signing-Authorized", "false");
+    return response;
+})) { BaseAddress = new Uri("https://loanhub.example/") };
+await Reject(async () => await new LoanHubOriginalContractReader(tamperedPdfHttp)
+    .ReadOriginalPdfAsync(prepared, company, "test-token", "wb1_test"),
+    "tampered PDF rejected despite matching server-provided checksum header");
+
+using var forgedGrantHttp = new HttpClient(new FakeHandler(_ => Json(new {
+    borrower_id = borrower, contracts = Array.Empty<object>(),
+    signing_authorized = true, contract_signed = false
+}))) { BaseAddress = new Uri("https://loanhub.example/") };
+await Reject(async () => await new LoanHubContractDiscovery(forgedGrantHttp)
+    .GetEligibleContractsAsync(borrower, company, "test-token", "wb1_test"),
+    "unexpected signing authorization rejected");
+
+using var wrongTenantHttp = new HttpClient(new FakeHandler(_ => Json(new {
+    borrower_id = Guid.NewGuid(), contracts = Array.Empty<object>(),
+    signing_authorized = false, contract_signed = false
+}))) { BaseAddress = new Uri("https://loanhub.example/") };
+await Reject(async () => await new LoanHubContractDiscovery(wrongTenantHttp)
+    .GetEligibleContractsAsync(borrower, company, "test-token", "wb1_test"),
+    "cross-borrower response rejected");
+
+using var forgedConsentHttp = new HttpClient(new FakeHandler(_ => Json(new {
+    intent_id = intentId, status = "consented", company_id = company,
+    borrower_id = borrower, contract_id = contract, document_version = "1",
+    document_sha256 = sha, expires_at = prepared.ExpiresAt,
+    signing_authorized = true, signed_contract_created = false,
+    signature_reuse_allowed = false
+}))) { BaseAddress = new Uri("https://loanhub.example/") };
+await Reject(async () => await new LoanHubDocumentConsentClient(forgedConsentHttp)
+    .RecordConsentAsync(prepared, company, "Reviewed exact PDF", "CONSENT-TEST-003",
+        sha, "test-token", "wb1_test"), "consent cannot silently grant signing");
+
 Console.WriteLine("PASS: exact contract discovery, preparation, original PDF verification, consent and negative checks.");
 
 static HttpResponseMessage Json(object data, HttpStatusCode status = HttpStatusCode.OK) =>
