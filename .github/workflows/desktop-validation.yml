@@ -20,6 +20,18 @@ jobs:
         run: dotnet restore IthuteSign.Modern/IthuteSign.Modern.csproj -p:Platform=x64
       - name: Build WinUI with Visual Studio MSBuild
         run: msbuild IthuteSign.Modern/IthuteSign.Modern.csproj /p:Configuration=Release /p:Platform=x64 /p:RestoreIgnoreFailedSources=false /verbosity:minimal
+  contract-api-tests:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: ithutesign-winui-v029
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Run exact-document contract client tests
+        run: dotnet run --project IthuteSign.ContractTests/IthuteSign.ContractTests.csproj --configuration Release
   python-syntax:
     runs-on: windows-latest
     steps:
