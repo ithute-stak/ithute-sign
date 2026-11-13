@@ -23,9 +23,12 @@ public sealed class LoanHubSession : IDisposable
         if (baseUri.Scheme != Uri.UriSchemeHttps || !string.IsNullOrEmpty(baseUri.UserInfo)
             || !string.IsNullOrEmpty(baseUri.Query) || !string.IsNullOrEmpty(baseUri.Fragment))
             throw new ArgumentException("LoanHub requires a clean HTTPS base URL.", nameof(baseUri));
-        _http = handler is null ? new HttpClient() : new HttpClient(handler);
+        _http = handler is null ? new HttpClient(new HttpClientHandler { AllowAutoRedirect = false }) : new HttpClient(handler);
         _http.BaseAddress = new Uri(baseUri.AbsoluteUri.TrimEnd('/') + "/");
         _http.Timeout = TimeSpan.FromSeconds(20);
+        // Device challenges and bearer tokens must not follow redirects to
+        // alternate origins. The caller can supply a test handler, but
+        // production requests use an explicit no-redirect transport.
     }
 
     public async Task<LoanHubUser> LoginAsync(
@@ -121,6 +124,7 @@ public sealed class LoanHubSession : IDisposable
             || challenge.CompanyId != CompanyId || challenge.EmployeeUserId != User?.Id
             || string.IsNullOrWhiteSpace(challenge.Nonce)
             || challenge.ExpiresAt <= DateTimeOffset.UtcNow
+            || challenge.ExpiresAt > DateTimeOffset.UtcNow.AddSeconds(31)
             || !challenge.DeviceProofRequired || challenge.SigningAuthorized)
             throw new InvalidOperationException("LoanHub returned an invalid device challenge.");
         return challenge;
