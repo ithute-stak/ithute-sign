@@ -79,6 +79,38 @@ public sealed class LoanHubSession : IDisposable
             cancellationToken: cancellationToken);
     }
 
+    /// <summary>
+    /// Requests a short-lived nonce for the registered device. This does not
+    /// sign the challenge: the enrolled private key must remain in the local
+    /// workstation bridge, not in the UI or its preferences.
+    /// </summary>
+    public async Task<DeviceChallenge> RequestDeviceChallengeAsync(
+        Guid workstationId, CancellationToken cancellationToken = default)
+    {
+        if (!IsAuthenticated) throw new UnauthorizedAccessException("Login is required.");
+        using var request = new HttpRequestMessage(HttpMethod.Post, "api/v1/wacom-bridge/device-challenges")
+        {
+            Content = JsonContent.Create(new { workstation_id = workstationId })
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _token);
+        using var response = await _http.SendAsync(request, cancellationToken);
+        if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+        {
+            Logout();
+            throw new UnauthorizedAccessException("LoanHub rejected the device challenge request.");
+        }
+        response.EnsureSuccessStatusCode();
+        var challenge = await response.Content.ReadFromJsonAsync<DeviceChallenge>(
+            cancellationToken: cancellationToken);
+        if (challenge is null || challenge.ChallengeId == Guid.Empty
+            || challenge.WorkstationId != workstationId
+            || string.IsNullOrWhiteSpace(challenge.Nonce)
+            || challenge.ExpiresAt <= DateTimeOffset.UtcNow
+            || !challenge.DeviceProofRequired || challenge.SigningAuthorized)
+            throw new InvalidOperationException("LoanHub returned an invalid device challenge.");
+        return challenge;
+    }
+
     public void Logout() { _token = null; User = null; }
     public void Dispose() { Logout(); _http.Dispose(); }
 
@@ -110,4 +142,14 @@ public sealed class LoanHubLoginException : Exception
     public HttpStatusCode StatusCode { get; }
     public LoanHubLoginException(HttpStatusCode code) : base("LoanHub login failed. Verify credentials and any required second factor.")
         => StatusCode = code;
+}
+
+public sealed class DeviceChallenge
+{
+    [JsonPropertyName("challenge_id")] public Guid ChallengeId { get; set; }
+    [JsonPropertyName("workstation_id")] public Guid WorkstationId { get; set; }
+    [JsonPropertyName("nonce")] public string? Nonce { get; set; }
+    [JsonPropertyName("expires_at")] public DateTimeOffset ExpiresAt { get; set; }
+    [JsonPropertyName("device_proof_required")] public bool DeviceProofRequired { get; set; }
+    [JsonPropertyName("signing_authorized")] public bool SigningAuthorized { get; set; }
 }
