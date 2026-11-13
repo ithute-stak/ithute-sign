@@ -49,6 +49,17 @@
                             <TextBlock x:Name="LoanHubLoginStatus" Text="Not connected. LoanHub signing is unavailable until authorized." TextWrapping="Wrap" />
                         </StackPanel>
                     </Border>
+                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="14" Padding="20">
+                        <StackPanel Spacing="12">
+                            <TextBlock Text="Company Loans" FontSize="24" FontWeight="SemiBold" />
+                            <TextBlock Text="Loans are loaded automatically after LoanHub employee login. Viewing does not require a Wacom connector." TextWrapping="Wrap" />
+                            <TextBox x:Name="CompanyLoansSearch" Header="Search loans" PlaceholderText="Folio, reference or status" TextChanged="CompanyLoansSearch_TextChanged" />
+                            <Button Content="Refresh loans" Click="RefreshCompanyLoans_Click" HorizontalAlignment="Left" />
+                            <TextBlock x:Name="CompanyLoansStatus" Text="Log in to load company loans." TextWrapping="Wrap" />
+                            <ListView x:Name="CompanyLoansList" Height="420" SelectionMode="Single" SelectionChanged="CompanyLoansList_SelectionChanged" />
+                            <TextBlock x:Name="CompanyLoanDetails" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
                     <StackPanel Spacing="6">
                         <TextBlock Text="Welcome to IthuteSign" FontSize="32" FontWeight="SemiBold" />
                         <TextBlock Text="Authenticated LoanHub contract review and Wacom evidence capture" Opacity="0.72" FontSize="15" />
