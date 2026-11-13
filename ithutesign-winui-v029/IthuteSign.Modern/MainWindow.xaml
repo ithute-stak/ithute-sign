@@ -33,6 +33,13 @@
                             <Button Content="Check local Wacom connector" Click="CheckLocalConnector_Click" />
                             <TextBlock x:Name="LocalConnectorStatus" Text="Local connector has not been checked. Signing disabled." TextWrapping="Wrap" />
                             <Button Content="Open secure local Wacom workstation desk" Click="OpenLocalWorkstationDesk_Click" />
+                            <Button Content="Open LoanHub signing desk inside IthuteSign" Click="OpenEmbeddedWorkstationDesk_Click" />
+                            <TextBlock x:Name="EmbeddedDeskStatus" Text="The authenticated signing desk is not open." TextWrapping="Wrap" />
+                            <Border x:Name="EmbeddedDeskPanel" Visibility="Collapsed" BorderThickness="1"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" CornerRadius="8">
+                                <WebView2 x:Name="EmbeddedDesk" Height="690"
+                                          NavigationStarting="EmbeddedDesk_NavigationStarting" />
+                            </Border>
                             <TextBlock Text="The existing LoanHub Go connector must already be running on this computer at 127.0.0.1:8767. It manages its own authenticated session and enrolled device proof. IthuteSign does not pass login tokens or private keys to it." TextWrapping="Wrap" Opacity="0.7" />
                             <TextBox x:Name="WorkstationId" Header="Approved workstation ID (UUID)" PlaceholderText="Enter the registered LoanHub workstation ID" />
                             <Button Content="Check my workstation assignment" Click="CheckWorkstation_Click" />
