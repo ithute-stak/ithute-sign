@@ -44,6 +44,41 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private async void CheckWorkstation_Click(object sender, RoutedEventArgs e)
+    {
+        WorkstationStatus.Text = "Workstation not verified. Signing disabled.";
+        if (_loanHubSession is null || !_loanHubSession.IsAuthenticated)
+        {
+            ShowError("Log in to LoanHub before checking this workstation.");
+            return;
+        }
+        if (!Guid.TryParse(WorkstationId.Text.Trim(), out var workstationId))
+        {
+            ShowError("Enter a valid registered workstation UUID.");
+            return;
+        }
+        try
+        {
+            using var assignment = await _loanHubSession.GetOperatorAssignmentAsync(workstationId);
+            var root = assignment.RootElement;
+            bool assigned = root.TryGetProperty("assigned", out var a) && a.ValueKind == JsonValueKind.True;
+            bool deviceProofRequired = root.TryGetProperty("device_proof_required", out var d) && d.ValueKind == JsonValueKind.True;
+            bool signingAuthorized = root.TryGetProperty("signing_authorized", out var g) && g.ValueKind == JsonValueKind.True;
+            if (!assigned)
+                throw new UnauthorizedAccessException("LoanHub did not confirm operator assignment.");
+            WorkstationStatus.Text = deviceProofRequired
+                ? "Operator assigned. Enrolled-device proof and signing authorization still required."
+                : signingAuthorized
+                    ? "Operator assigned. Additional document-specific signing authorization is still required."
+                    : "Operator assigned. Signing remains disabled pending further authorization.";
+        }
+        catch (Exception ex)
+        {
+            WorkstationStatus.Text = "Workstation verification failed. Signing disabled.";
+            ShowError("Workstation access denied: " + ex.Message);
+        }
+    }
+
     private void LoanHubLogout_Click(object sender, RoutedEventArgs e)
     {
         _loanHubSession?.Dispose();
@@ -51,6 +86,7 @@ public sealed partial class MainWindow : Window
         LoanHubPassword.Password = "";
         LoanHubOtp.Password = "";
         LoanHubLoginStatus.Text = "Logged out. LoanHub signing is unavailable.";
+        WorkstationStatus.Text = "Workstation not verified. Signing disabled.";
     }
 
     private string? _selectedPath;
