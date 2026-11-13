@@ -19,6 +19,20 @@
             </NavigationView.MenuItems>
             <ScrollViewer>
                 <StackPanel Padding="40,30,40,40" Spacing="20" MaxWidth="1050" HorizontalAlignment="Left">
+                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="14" Padding="20">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="LoanHub employee login" FontSize="20" FontWeight="SemiBold" />
+                            <TextBox x:Name="LoanHubUrl" Header="LoanHub HTTPS address" Text="https://ithute.co.ls/" />
+                            <TextBox x:Name="LoanHubPhone" Header="Phone number" />
+                            <PasswordBox x:Name="LoanHubPassword" Header="Password" />
+                            <PasswordBox x:Name="LoanHubOtp" Header="OTP (when required)" />
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <Button Content="Log in to LoanHub" Click="LoanHubLogin_Click" />
+                                <Button Content="Log out" Click="LoanHubLogout_Click" />
+                            </StackPanel>
+                            <TextBlock x:Name="LoanHubLoginStatus" Text="Not connected. LoanHub signing is unavailable until authorized." TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
                     <StackPanel Spacing="6">
                         <TextBlock Text="Welcome to IthuteSign" FontSize="32" FontWeight="SemiBold" />
                         <TextBlock Text="Your offline document signing workspace" Opacity="0.72" FontSize="15" />
