@@ -115,7 +115,7 @@ public sealed partial class MainWindow : Window
 
     private async void ContractPreflight_Click(object sender, RoutedEventArgs e)
     {
-        ContractPreflightStatus.Text = "Checking LoanHub operator and workstation authorization. Signing disabled.";
+        ContractPreflightStatus.Text = "Checking authorization for National ID document lookup. Signing disabled.";
         if (_loanHubSession is null || !_loanHubSession.IsAuthenticated)
         {
             ContractPreflightStatus.Text = "Log in as an authorized LoanHub employee first. Signing disabled.";
@@ -124,7 +124,7 @@ public sealed partial class MainWindow : Window
         if (string.IsNullOrWhiteSpace(ContractReference.Text)
             || ContractReference.Text.Trim().Length > 128)
         {
-            ContractPreflightStatus.Text = "Enter a valid LoanHub contract reference (up to 128 characters).";
+            ContractPreflightStatus.Text = "Enter the client National ID exactly as registered (up to 128 characters).";
             return;
         }
         if (!Guid.TryParse(WorkstationId.Text.Trim(), out var workstationId))
@@ -141,8 +141,8 @@ public sealed partial class MainWindow : Window
             if (!assigned)
                 throw new UnauthorizedAccessException("LoanHub has not confirmed operator assignment.");
             ContractPreflightStatus.Text = "Employee and workstation assignment checked. "
-                + "Contract retrieval, document-specific authorization, enrolled-device proof, "
-                + "and signing are NOT yet implemented in this workspace. No contract was fetched or changed.";
+                + "National ID lookup of all unsigned loan documents requires the verified LoanHub backend API. "
+                + "No client data was retrieved or changed; signing remains disabled.";
         }
         catch (Exception ex)
         {
