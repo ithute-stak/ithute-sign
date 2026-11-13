@@ -15,7 +15,8 @@ public static class DeviceProofMessage
         if (challenge is null || challenge.ChallengeId == Guid.Empty
             || challenge.WorkstationId == Guid.Empty || companyId == Guid.Empty
             || employeeId == Guid.Empty || !challenge.DeviceProofRequired
-            || challenge.SigningAuthorized || challenge.ExpiresAt <= DateTimeOffset.UtcNow)
+            || challenge.SigningAuthorized || challenge.ExpiresAt <= DateTimeOffset.UtcNow
+            || challenge.ExpiresAt > DateTimeOffset.UtcNow.AddSeconds(31))
             throw new InvalidOperationException("Invalid or expired workstation challenge.");
         var nonce = challenge.Nonce ?? "";
         if (nonce.Length != 43 || nonce.Any(c => !(char.IsLetterOrDigit(c) || c is '-' or '_')))
