@@ -15,10 +15,11 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
+      - uses: microsoft/setup-msbuild@v2
       - name: Restore WinUI
         run: dotnet restore IthuteSign.Modern/IthuteSign.Modern.csproj -p:Platform=x64
-      - name: Build WinUI
-        run: dotnet build IthuteSign.Modern/IthuteSign.Modern.csproj --no-restore -c Release -p:Platform=x64
+      - name: Build WinUI with Visual Studio MSBuild
+        run: msbuild IthuteSign.Modern/IthuteSign.Modern.csproj /p:Configuration=Release /p:Platform=x64 /p:RestoreIgnoreFailedSources=false /verbosity:minimal
   python-syntax:
     runs-on: windows-latest
     steps:
