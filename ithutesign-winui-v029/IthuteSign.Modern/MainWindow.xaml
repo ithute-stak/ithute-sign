@@ -13,15 +13,15 @@
                 </StackPanel>
             </NavigationView.PaneHeader>
             <NavigationView.MenuItems>
-                <NavigationViewItem Content="Dashboard" Icon="Home" IsSelected="True" />
-                <NavigationViewItem Content="Documents" Icon="Document" />
-                <NavigationViewItem Content="Signing workspace" Icon="Edit" />
+                <NavigationViewItem Content="LoanHub signing" Icon="Home" IsSelected="True" />
+                <NavigationViewItem Content="Workstation" Icon="Document" />
+                <NavigationViewItem Content="Contract review" Icon="Edit" />
             </NavigationView.MenuItems>
             <ScrollViewer>
                 <StackPanel Padding="40,30,40,40" Spacing="20" MaxWidth="1050" HorizontalAlignment="Left">
                     <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="14" Padding="20">
                         <StackPanel Spacing="10">
-                            <TextBlock Text="LoanHub employee login" FontSize="20" FontWeight="SemiBold" />
+                            <TextBlock Text="LoanHub employee and workstation access" FontSize="20" FontWeight="SemiBold" />
                             <TextBox x:Name="LoanHubUrl" Header="LoanHub HTTPS address" Text="https://ithute.co.ls/" />
                             <TextBox x:Name="LoanHubPhone" Header="Phone number" />
                             <PasswordBox x:Name="LoanHubPassword" Header="Password" />
@@ -40,7 +40,7 @@
                                 <WebView2 x:Name="EmbeddedDesk" Height="690"
                                           NavigationStarting="EmbeddedDesk_NavigationStarting" />
                             </Border>
-                            <TextBlock Text="The existing LoanHub Go connector must already be running on this computer at 127.0.0.1:8767. It manages its own authenticated session and enrolled device proof. IthuteSign does not pass login tokens or private keys to it." TextWrapping="Wrap" Opacity="0.7" />
+                            <TextBlock Text="Start the enrolled LoanHub Go Wacom connector on this PC. Open the embedded signing desk and sign in there. This Windows login does not authorize the connector automatically." TextWrapping="Wrap" Opacity="0.7" />
                             <TextBox x:Name="WorkstationId" Header="Approved workstation ID (UUID)" PlaceholderText="Enter the registered LoanHub workstation ID" />
                             <Button Content="Check my workstation assignment" Click="CheckWorkstation_Click" />
                             <TextBlock Text="Device proof is performed inside the enrolled local connector. A challenge expires after 30 seconds and must be signed and submitted immediately by the connector." TextWrapping="Wrap" Opacity="0.7" />
@@ -51,8 +51,10 @@
                     </Border>
                     <StackPanel Spacing="6">
                         <TextBlock Text="Welcome to IthuteSign" FontSize="32" FontWeight="SemiBold" />
-                        <TextBlock Text="Your offline document signing workspace" Opacity="0.72" FontSize="15" />
+                        <TextBlock Text="Authenticated LoanHub contract review and Wacom evidence capture" Opacity="0.72" FontSize="15" />
                     </StackPanel>
+                    <!-- Legacy arbitrary-file workflow is not part of LoanHub signing. -->
+                    <StackPanel Visibility="Collapsed">
                     <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                             BorderThickness="1" CornerRadius="16" Padding="28">
@@ -110,6 +112,7 @@
                             </StackPanel>
                         </StackPanel>
                     </Border>
+                    </StackPanel>
                     <InfoBar x:Name="StatusBar" IsOpen="False" Severity="Informational" IsClosable="True" />
                 </StackPanel>
             </ScrollViewer>
