@@ -14,6 +14,8 @@ public sealed partial class MainWindow : Window
 {
     private readonly List<string> _recent = new();
     private LoanHubSession? _loanHubSession;
+    private IReadOnlyList<CompanyLoanRow> _companyLoans = Array.Empty<CompanyLoanRow>();
+    private bool _loansLoading;
 
     private async void TestWacom_Click(object sender, RoutedEventArgs e)
     {
@@ -99,6 +101,7 @@ public sealed partial class MainWindow : Window
                     LoanHubPhone.Text, LoanHubPassword.Password, LoanHubOtp.Password);
                 var companyName = await session.GetCompanyNameAsync();
                 _loanHubSession = session;
+                await RefreshCompanyLoansAsync();
                 LoanHubLoginStatus.Text =
                     $"Authenticated: {user.Phone} | Company: {companyName}. Signing requires separate workstation and document authorization.";
             }
@@ -114,6 +117,51 @@ public sealed partial class MainWindow : Window
             LoanHubLoginStatus.Text = "Not connected.";
             ShowError("LoanHub login failed: " + ex.Message);
         }
+    }
+
+    private async Task RefreshCompanyLoansAsync()
+    {
+        if (_loanHubSession is null || !_loanHubSession.IsAuthenticated || _loansLoading) return;
+        _loansLoading = true;
+        CompanyLoansStatus.Text = "Loading company loans...";
+        try
+        {
+            _companyLoans = await _loanHubSession.GetCompanyLoansAsync();
+            FilterCompanyLoans();
+        }
+        catch (Exception ex)
+        {
+            _companyLoans = Array.Empty<CompanyLoanRow>();
+            CompanyLoansList.ItemsSource = null;
+            CompanyLoansStatus.Text = "Unable to load company loans: " + ex.Message;
+        }
+        finally { _loansLoading = false; }
+    }
+
+    private void FilterCompanyLoans()
+    {
+        var search = CompanyLoansSearch.Text?.Trim() ?? "";
+        var filtered = _companyLoans.Where(loan =>
+            string.IsNullOrEmpty(search) ||
+            (loan.FolioNumber?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false) ||
+            (loan.LoanReference?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false) ||
+            (loan.Status?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false)).ToArray();
+        CompanyLoansList.ItemsSource = filtered;
+        CompanyLoansStatus.Text = $"Showing {filtered.Length} of {_companyLoans.Count} company loans.";
+    }
+
+    private void CompanyLoansSearch_TextChanged(object sender, TextChangedEventArgs e) => FilterCompanyLoans();
+
+    private async void RefreshCompanyLoans_Click(object sender, RoutedEventArgs e) =>
+        await RefreshCompanyLoansAsync();
+
+    private void CompanyLoansList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (CompanyLoansList.SelectedItem is CompanyLoanRow loan)
+            CompanyLoanDetails.Text = $"Loan: {loan.FolioNumber} | Reference: {loan.LoanReference} | " +
+                $"Status: {loan.Status} | Principal: LSL {loan.Principal:N2} | " +
+                $"Total: LSL {loan.TotalRepayable:N2} | Balance: LSL {loan.Balance:N2}" +
+                (loan.MaturityDate is null ? "" : $" | Maturity: {loan.MaturityDate:dd MMM yyyy}");
     }
 
     private async void ContractPreflight_Click(object sender, RoutedEventArgs e)
@@ -360,6 +408,10 @@ public sealed partial class MainWindow : Window
     {
         _loanHubSession?.Dispose();
         _loanHubSession = null;
+        _companyLoans = Array.Empty<CompanyLoanRow>();
+        CompanyLoansList.ItemsSource = null;
+        CompanyLoanDetails.Text = "";
+        CompanyLoansStatus.Text = "Log in to load company loans.";
         LoanHubPassword.Password = "";
         LoanHubOtp.Password = "";
         LoanHubLoginStatus.Text = "Logged out. LoanHub signing is unavailable.";
