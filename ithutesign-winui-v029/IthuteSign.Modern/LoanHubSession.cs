@@ -15,6 +15,7 @@ public sealed class LoanHubSession : IDisposable
     private readonly HttpClient _http;
     private string? _token;
     public LoanHubUser? User { get; private set; }
+    public Guid? CompanyId { get; private set; }
     public bool IsAuthenticated => _token is not null && User is not null;
 
     public LoanHubSession(Uri baseUri, HttpMessageHandler? handler = null)
@@ -54,8 +55,20 @@ public sealed class LoanHubSession : IDisposable
             throw new InvalidOperationException("LoanHub returned an invalid login response.");
         if (!payload.User.IsActive || payload.User.MustChangePassword)
             throw new UnauthorizedAccessException("Account is inactive or requires a password change in LoanHub.");
-        if (payload.User.Memberships is null || !payload.User.Memberships.Any(m => m.IsActive))
-            throw new UnauthorizedAccessException("A current company staff membership is required.");
+        // Never infer a tenant from an arbitrary membership or accept a borrower
+        // login as a signing operator. Multi-company users require an explicit
+        // tenant selector before a session can be established.
+        if (string.Equals(payload.User.Role, "borrower", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(payload.User.Role, "client", StringComparison.OrdinalIgnoreCase))
+            throw new UnauthorizedAccessException("Borrower accounts cannot operate IthuteSign.");
+        var active = payload.User.Memberships?
+            .Where(m => m.IsActive && m.CompanyId != Guid.Empty &&
+                !string.Equals(m.Role, "borrower", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(m.Role, "client", StringComparison.OrdinalIgnoreCase))
+            .Select(m => m.CompanyId).Distinct().ToArray() ?? Array.Empty<Guid>();
+        if (active.Length != 1)
+            throw new UnauthorizedAccessException("Exactly one active staff company membership is required; multi-company selection is not yet supported.");
+        CompanyId = active[0];
         _token = payload.AccessToken;
         User = payload.User;
         return User;
@@ -68,6 +81,7 @@ public sealed class LoanHubSession : IDisposable
         using var request = new HttpRequestMessage(HttpMethod.Get,
             $"api/v1/contract-signing/workstations/{workstationId:D}/my-assignment");
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _token);
+        request.Headers.Add("X-Company-ID", CompanyId?.ToString("D") ?? throw new UnauthorizedAccessException("Company context unavailable."));
         using var response = await _http.SendAsync(request, cancellationToken);
         if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
         {
@@ -104,7 +118,7 @@ public sealed class LoanHubSession : IDisposable
             cancellationToken: cancellationToken);
         if (challenge is null || challenge.ChallengeId == Guid.Empty
             || challenge.WorkstationId != workstationId
-            || challenge.CompanyId == Guid.Empty || challenge.EmployeeUserId != User?.Id
+            || challenge.CompanyId != CompanyId || challenge.EmployeeUserId != User?.Id
             || string.IsNullOrWhiteSpace(challenge.Nonce)
             || challenge.ExpiresAt <= DateTimeOffset.UtcNow
             || !challenge.DeviceProofRequired || challenge.SigningAuthorized)
@@ -112,7 +126,7 @@ public sealed class LoanHubSession : IDisposable
         return challenge;
     }
 
-    public void Logout() { _token = null; User = null; }
+    public void Logout() { _token = null; User = null; CompanyId = null; }
     public void Dispose() { Logout(); _http.Dispose(); }
 
     private sealed class LoginPayload
