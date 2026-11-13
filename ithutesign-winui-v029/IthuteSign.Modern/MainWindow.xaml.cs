@@ -108,6 +108,37 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private async void CheckLocalConnector_Click(object sender, RoutedEventArgs e)
+    {
+        LocalConnectorStatus.Text = "Checking local connector. Signing disabled.";
+        try
+        {
+            // Fixed loopback host; no user-controlled URL or auth credentials.
+            // A reachable HTML page is NOT proof of employee authentication,
+            // registered workstation identity or signing authorization.
+            using var handler = new HttpClientHandler
+            {
+                AllowAutoRedirect = false,
+                UseCookies = false,
+                UseProxy = false
+            };
+            using var http = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(3) };
+            using var request = new HttpRequestMessage(HttpMethod.Get, "http://127.0.0.1:8767/");
+            using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+            var contentType = response.Content.Headers.ContentType?.MediaType;
+            if (response.StatusCode != System.Net.HttpStatusCode.OK ||
+                !string.Equals(contentType, "text/html", StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Unexpected local connector response.");
+            LocalConnectorStatus.Text =
+                "Local workstation desk is reachable. Open it to log in and complete device verification. Signing remains disabled.";
+        }
+        catch
+        {
+            LocalConnectorStatus.Text =
+                "Local workstation desk unavailable. Start the approved Go connector in --pc-ui mode. Signing disabled.";
+        }
+    }
+
     private void OpenLocalWorkstationDesk_Click(object sender, RoutedEventArgs e)
     {
         // Fixed loopback address only. Do not forward the WinUI bearer token,
