@@ -156,6 +156,34 @@ public sealed class LoanHubSession : IDisposable
         return challenge;
     }
 
+
+    /// <summary>Read-only, tenant-scoped company loans. The server enforces role/branch scope.</summary>
+    public async Task<IReadOnlyList<CompanyLoanRow>> GetCompanyLoansAsync(CancellationToken cancellationToken = default)
+    {
+        if (!IsAuthenticated || CompanyId is null)
+            throw new UnauthorizedAccessException("LoanHub employee login is required.");
+        var result = new List<CompanyLoanRow>();
+        const int pageSize = 500;
+        for (int skip = 0; skip < 10000; skip += pageSize)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get,
+                $"api/v1/loans/?skip={skip}&limit={pageSize}");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _token);
+            request.Headers.Add("X-Company-ID", CompanyId.Value.ToString("D"));
+            using var response = await _http.SendAsync(request, cancellationToken);
+            if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+                throw new UnauthorizedAccessException("LoanHub denied access to company loans.");
+            response.EnsureSuccessStatusCode();
+            var page = await response.Content.ReadFromJsonAsync<List<CompanyLoanRow>>(cancellationToken: cancellationToken)
+                ?? throw new InvalidOperationException("LoanHub returned an invalid loans response.");
+            if (page.Any(loan => loan.CompanyId != CompanyId.Value))
+                throw new InvalidOperationException("LoanHub returned a loan outside the authenticated company.");
+            result.AddRange(page);
+            if (page.Count < pageSize) return result;
+        }
+        throw new InvalidOperationException("Loan listing exceeded 10,000 records. Pagination support is required.");
+    }
+
     public void Logout() { _token = null; User = null; CompanyId = null; }
     public void Dispose() { Logout(); _http.Dispose(); }
 
@@ -199,4 +227,23 @@ public sealed class DeviceChallenge
     [JsonPropertyName("expires_at")] public DateTimeOffset ExpiresAt { get; set; }
     [JsonPropertyName("device_proof_required")] public bool DeviceProofRequired { get; set; }
     [JsonPropertyName("signing_authorized")] public bool SigningAuthorized { get; set; }
+}
+
+public sealed class CompanyLoanRow
+{
+    [JsonPropertyName("id")] public Guid Id { get; set; }
+    [JsonPropertyName("company_id")] public Guid CompanyId { get; set; }
+    [JsonPropertyName("borrower_id")] public Guid BorrowerId { get; set; }
+    [JsonPropertyName("folio_number")] public string? FolioNumber { get; set; }
+    [JsonPropertyName("loan_reference")] public string? LoanReference { get; set; }
+    [JsonPropertyName("status")] public string? Status { get; set; }
+    [JsonPropertyName("principal_amount")] public decimal Principal { get; set; }
+    [JsonPropertyName("balance")] public decimal Balance { get; set; }
+    [JsonPropertyName("total_repayable")] public decimal TotalRepayable { get; set; }
+    [JsonPropertyName("maturity_date")] public DateTime? MaturityDate { get; set; }
+    [JsonPropertyName("is_top_up")] public bool IsTopUp { get; set; }
+    public override string ToString() =>
+        $"{FolioNumber ?? LoanReference}   |   {LoanReference}   |   {Status}   |   " +
+        $"Principal LSL {Principal:N2}   |   Balance LSL {Balance:N2}" +
+        (IsTopUp ? "   |   TOP-UP" : "");
 }
