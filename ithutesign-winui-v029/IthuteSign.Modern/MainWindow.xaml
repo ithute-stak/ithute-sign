@@ -40,7 +40,7 @@
                                 <WebView2 x:Name="EmbeddedDesk" Height="690"
                                           NavigationStarting="EmbeddedDesk_NavigationStarting" />
                             </Border>
-                            <TextBlock Text="Start the enrolled LoanHub Go Wacom connector on this PC. Open the embedded signing desk and sign in there. This Windows login does not authorize the connector automatically." TextWrapping="Wrap" Opacity="0.7" />
+                            <TextBlock Text="The signing desk requires an enrolled workstation and a running local hardware service. LoanHub login alone does not authorize a signature." TextWrapping="Wrap" Opacity="0.7" />
                             <TextBox x:Name="WorkstationId" Header="Approved workstation ID (UUID)" PlaceholderText="Enter the registered LoanHub workstation ID" />
                             <Button Content="Check my workstation assignment" Click="CheckWorkstation_Click" />
                             <TextBlock Text="Device proof is performed inside the enrolled local connector. A challenge expires after 30 seconds and must be signed and submitted immediately by the connector." TextWrapping="Wrap" Opacity="0.7" />
@@ -64,7 +64,7 @@
                     <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="14" Padding="20">
                         <StackPanel Spacing="10">
                             <TextBlock Text="LoanHub contract workspace — authorization preflight" FontSize="20" FontWeight="SemiBold" />
-                            <TextBlock Text="Find eligible unsigned contracts by National ID inside the verified LoanHub workstation desk. The local connector holds the device proof and bridge session; this standalone preflight does not retrieve or sign contracts." TextWrapping="Wrap" />
+                            <TextBlock Text="Search by client National ID in the verified signing desk, then review eligible unsigned contracts. The service must confirm workstation authorization before any signature can be submitted." TextWrapping="Wrap" />
                             <TextBox x:Name="ContractReference" Header="Client National ID" PlaceholderText="Enter the client National ID exactly as registered in LoanHub" />
                             <Button Content="Check unsigned-document search readiness" Click="ContractPreflight_Click" HorizontalAlignment="Left" />
                             <Button Content="Open verified unsigned-contract picker" Click="OpenEmbeddedWorkstationDesk_Click" HorizontalAlignment="Left" />
