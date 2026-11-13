@@ -113,6 +113,44 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private async void ContractPreflight_Click(object sender, RoutedEventArgs e)
+    {
+        ContractPreflightStatus.Text = "Checking LoanHub operator and workstation authorization. Signing disabled.";
+        if (_loanHubSession is null || !_loanHubSession.IsAuthenticated)
+        {
+            ContractPreflightStatus.Text = "Log in as an authorized LoanHub employee first. Signing disabled.";
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(ContractReference.Text)
+            || ContractReference.Text.Trim().Length > 128)
+        {
+            ContractPreflightStatus.Text = "Enter a valid LoanHub contract reference (up to 128 characters).";
+            return;
+        }
+        if (!Guid.TryParse(WorkstationId.Text.Trim(), out var workstationId))
+        {
+            ContractPreflightStatus.Text = "Enter the registered workstation UUID. Signing disabled.";
+            return;
+        }
+        try
+        {
+            using var assignment = await _loanHubSession.GetOperatorAssignmentAsync(workstationId);
+            var root = assignment.RootElement;
+            bool assigned = root.TryGetProperty("assigned", out var value)
+                && value.ValueKind == JsonValueKind.True;
+            if (!assigned)
+                throw new UnauthorizedAccessException("LoanHub has not confirmed operator assignment.");
+            ContractPreflightStatus.Text = "Employee and workstation assignment checked. "
+                + "Contract retrieval, document-specific authorization, enrolled-device proof, "
+                + "and signing are NOT yet implemented in this workspace. No contract was fetched or changed.";
+        }
+        catch (Exception ex)
+        {
+            ContractPreflightStatus.Text = "Preflight failed. No contract was fetched or changed. "
+                + ex.Message;
+        }
+    }
+
     private async void CheckWorkstation_Click(object sender, RoutedEventArgs e)
     {
         WorkstationStatus.Text = "Workstation not verified. Signing disabled.";
