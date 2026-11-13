@@ -108,6 +108,24 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private void OpenLocalWorkstationDesk_Click(object sender, RoutedEventArgs e)
+    {
+        // Fixed loopback address only. Do not forward the WinUI bearer token,
+        // workstation key, company context, or a server-issued challenge.
+        // The Go connector has its own cookie/CSRF and employee login.
+        try
+        {
+            Process.Start(new ProcessStartInfo("http://127.0.0.1:8767/")
+            {
+                UseShellExecute = true
+            });
+        }
+        catch
+        {
+            ShowError("Could not open the local workstation desk. Start the approved LoanHub Wacom connector in --pc-ui mode first.");
+        }
+    }
+
     private void LoanHubLogout_Click(object sender, RoutedEventArgs e)
     {
         _loanHubSession?.Dispose();
@@ -116,6 +134,7 @@ public sealed partial class MainWindow : Window
         LoanHubOtp.Password = "";
         LoanHubLoginStatus.Text = "Logged out. LoanHub signing is unavailable.";
         WorkstationStatus.Text = "Workstation not verified. Signing disabled.";
+        DeviceChallengeStatus.Text = "Device proof not verified. Signing disabled.";
     }
 
     private string? _selectedPath;
