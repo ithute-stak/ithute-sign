@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.IO;
 using Microsoft.UI.Xaml;
@@ -47,10 +48,30 @@ public sealed partial class MainWindow : Window
             WacomDiagnosticStatus.Text = "Waiting for Wacom test capture...";
             using var process = Process.Start(start)
                 ?? throw new InvalidOperationException("Wacom capture process could not start.");
-            await process.WaitForExitAsync();
-            if (process.ExitCode == 0 && File.Exists(output) && new FileInfo(output).Length > 0)
+            using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(3));
+            try
+            {
+                await process.WaitForExitAsync(timeout.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                if (!process.HasExited) process.Kill(entireProcessTree: true);
+                WacomDiagnosticStatus.Text = "Wacom test timed out. No LoanHub contract was changed.";
+                return;
+            }
+            if (process.ExitCode == 0 && File.Exists(output))
+            {
+                var bytes = await File.ReadAllBytesAsync(output);
+                byte[] signature = { 137, 80, 78, 71, 13, 10, 26, 10 };
+                if (bytes.Length < 33 || bytes.Length > 10 * 1024 * 1024
+                    || !bytes.AsSpan(0, 8).SequenceEqual(signature)
+                    || System.Text.Encoding.ASCII.GetString(bytes, 12, 4) != "IHDR")
+                    throw new InvalidDataException("The capture bridge did not produce a valid PNG header.");
+                var digest = Convert.ToHexString(SHA256.HashData(bytes));
                 WacomDiagnosticStatus.Text = "Hardware test saved locally: " + output
-                    + " (not a signed LoanHub contract).";
+                    + " | SHA-256: " + digest
+                    + " | Diagnostic only; no LoanHub contract was signed.";
+            }
             else
                 WacomDiagnosticStatus.Text = "Hardware test cancelled or failed. No LoanHub contract was changed.";
         }
