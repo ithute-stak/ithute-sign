@@ -1,3 +1,5 @@
+using Microsoft.Maui;
+using Microsoft.Maui.Hosting;
 namespace IthuteSign.Blazor.WinUI;
 public partial class App : MauiWinUIApplication
 {
