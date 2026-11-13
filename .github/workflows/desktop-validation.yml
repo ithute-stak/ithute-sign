@@ -1,0 +1,31 @@
+name: IthuteSign desktop source validation
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+jobs:
+  winui-build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: ithutesign-winui-v029
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - uses: microsoft/setup-msbuild@v2
+      - name: Restore WinUI
+        run: dotnet restore IthuteSign.Modern/IthuteSign.Modern.csproj -p:Platform=x64
+      - name: Build WinUI with Visual Studio MSBuild
+        run: msbuild IthuteSign.Modern/IthuteSign.Modern.csproj /p:Configuration=Release /p:Platform=x64 /p:RestoreIgnoreFailedSources=false /verbosity:minimal
+  python-syntax:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile Python sources
+        run: python -m compileall -q ithute-sign/app ithute-sign/tests
