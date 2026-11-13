@@ -77,6 +77,31 @@ public sealed class LoanHubSession : IDisposable
         return User;
     }
 
+    /// <summary>Resolve the authenticated employee's single active company from LoanHub.</summary>
+    public async Task<string> GetCompanyNameAsync(CancellationToken cancellationToken = default)
+    {
+        if (!IsAuthenticated || CompanyId is null)
+            throw new UnauthorizedAccessException("LoanHub staff login is required.");
+        using var request = new HttpRequestMessage(HttpMethod.Get,
+            $"api/v1/companies/{CompanyId.Value:D}");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _token);
+        using var response = await _http.SendAsync(request, cancellationToken);
+        if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+        {
+            Logout();
+            throw new UnauthorizedAccessException("LoanHub denied access to the selected company.");
+        }
+        response.EnsureSuccessStatusCode();
+        using var payload = await response.Content.ReadFromJsonAsync<JsonDocument>(cancellationToken: cancellationToken);
+        if (payload is null || !payload.RootElement.TryGetProperty("id", out var id)
+            || !Guid.TryParse(id.GetString(), out var companyId) || companyId != CompanyId
+            || !payload.RootElement.TryGetProperty("name", out var name)
+            || name.ValueKind != JsonValueKind.String
+            || string.IsNullOrWhiteSpace(name.GetString()))
+            throw new InvalidOperationException("LoanHub returned an invalid company record.");
+        return name.GetString()!.Trim();
+    }
+
     public async Task<JsonDocument> GetOperatorAssignmentAsync(
         Guid workstationId, CancellationToken cancellationToken = default)
     {
