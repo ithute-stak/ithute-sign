@@ -36,7 +36,7 @@
                             <TextBlock Text="The existing LoanHub Go connector must already be running on this computer at 127.0.0.1:8767. It manages its own authenticated session and enrolled device proof. IthuteSign does not pass login tokens or private keys to it." TextWrapping="Wrap" Opacity="0.7" />
                             <TextBox x:Name="WorkstationId" Header="Approved workstation ID (UUID)" PlaceholderText="Enter the registered LoanHub workstation ID" />
                             <Button Content="Check my workstation assignment" Click="CheckWorkstation_Click" />
-                            <Button Content="Request device proof challenge" Click="RequestDeviceChallenge_Click" />
+                            <TextBlock Text="Device proof is performed inside the enrolled local connector. A challenge expires after 30 seconds and must be signed and submitted immediately by the connector." TextWrapping="Wrap" Opacity="0.7" />
                             <TextBlock x:Name="DeviceChallengeStatus" Text="Device proof has not been requested. Signing disabled." TextWrapping="Wrap" />
                             <TextBlock x:Name="WorkstationStatus" Text="Workstation not verified. Signing disabled." TextWrapping="Wrap" />
                             <TextBlock x:Name="LoanHubLoginStatus" Text="Not connected. LoanHub signing is unavailable until authorized." TextWrapping="Wrap" />

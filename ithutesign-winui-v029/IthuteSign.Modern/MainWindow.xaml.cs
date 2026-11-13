@@ -47,7 +47,7 @@ public sealed partial class MainWindow : Window
     private async void CheckWorkstation_Click(object sender, RoutedEventArgs e)
     {
         WorkstationStatus.Text = "Workstation not verified. Signing disabled.";
-        DeviceChallengeStatus.Text = "Device proof not verified. Signing disabled.";
+        DeviceChallengeStatus.Text = "Complete device proof inside the enrolled local connector. Signing disabled.";
         if (_loanHubSession is null || !_loanHubSession.IsAuthenticated)
         {
             ShowError("Log in to LoanHub before checking this workstation.");
@@ -77,34 +77,6 @@ public sealed partial class MainWindow : Window
         {
             WorkstationStatus.Text = "Workstation verification failed. Signing disabled.";
             ShowError("Workstation access denied: " + ex.Message);
-        }
-    }
-
-    private async void RequestDeviceChallenge_Click(object sender, RoutedEventArgs e)
-    {
-        DeviceChallengeStatus.Text = "Device proof not verified. Signing disabled.";
-        if (_loanHubSession is null || !_loanHubSession.IsAuthenticated ||
-            !Guid.TryParse(WorkstationId.Text.Trim(), out var workstationId))
-        {
-            ShowError("Log in and enter a registered workstation ID first.");
-            return;
-        }
-        try
-        {
-            var challenge = await _loanHubSession.RequestDeviceChallengeAsync(workstationId);
-            // Ensure our transcript exactly matches LoanHub's proof protocol.
-            // Signing and submission must be done by the enrolled local bridge.
-            _ = DeviceProofMessage.Create(challenge, challenge.CompanyId, challenge.EmployeeUserId);
-            // Do not expose nonce or credentials in UI/logs. The enrolled
-            // workstation bridge must sign and submit proof in a later phase.
-            DeviceChallengeStatus.Text =
-                $"Challenge issued (expires {challenge.ExpiresAt.LocalDateTime:t}). " +
-                "Device-key proof is still required. Signing disabled.";
-        }
-        catch (Exception ex)
-        {
-            DeviceChallengeStatus.Text = "Device challenge unavailable. Signing disabled.";
-            ShowError("Device challenge failed: " + ex.Message);
         }
     }
 
