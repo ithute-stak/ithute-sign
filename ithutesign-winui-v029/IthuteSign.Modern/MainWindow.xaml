@@ -30,6 +30,8 @@
                                 <Button Content="Log in to LoanHub" Click="LoanHubLogin_Click" />
                                 <Button Content="Log out" Click="LoanHubLogout_Click" />
                             </StackPanel>
+                            <Button Content="Open secure local Wacom workstation desk" Click="OpenLocalWorkstationDesk_Click" />
+                            <TextBlock Text="The existing LoanHub Go connector must already be running on this computer at 127.0.0.1:8767. It manages its own authenticated session and enrolled device proof. IthuteSign does not pass login tokens or private keys to it." TextWrapping="Wrap" Opacity="0.7" />
                             <TextBox x:Name="WorkstationId" Header="Approved workstation ID (UUID)" PlaceholderText="Enter the registered LoanHub workstation ID" />
                             <Button Content="Check my workstation assignment" Click="CheckWorkstation_Click" />
                             <Button Content="Request device proof challenge" Click="RequestDeviceChallenge_Click" />
