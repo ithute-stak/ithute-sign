@@ -1,0 +1,24 @@
+name: IthuteSign WinUI Windows compile
+on:
+  pull_request:
+    paths:
+      - 'ithutesign-winui-v029/IthuteSign.Modern/**'
+      - '.github/workflows/ithutesign-winui-build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Restore WinUI desktop app
+        run: dotnet restore ithutesign-winui-v029/IthuteSign.Modern/IthuteSign.Modern.csproj -p:Platform=x64
+      - name: Compile WinUI desktop app
+        run: dotnet build ithutesign-winui-v029/IthuteSign.Modern/IthuteSign.Modern.csproj -c Release -p:Platform=x64 -p:BundleWacomCapture=false --no-restore
