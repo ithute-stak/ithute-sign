@@ -181,7 +181,7 @@ public sealed partial class MainWindow : Window
             _loanHubSession.CompanyId == candidate.CompanyId &&
             _companyLoans.Any(loan => ReferenceEquals(loan, candidate))
             ? candidate : null;
-        ReviewSelectedLoanContract.IsEnabled = _selectedLoan is not null;
+        // A selected loan alone is not a verified Wacom bridge session. Keep\n        // contract discovery disabled until the authenticated connector supplies\n        // a scoped session through an approved integration.\n        ReviewSelectedLoanContract.IsEnabled = false;
         if (_selectedLoan is not { } loan)
         {
             CompanyLoanDetails.Text = "Select a loan to review its details.";
@@ -194,7 +194,7 @@ public sealed partial class MainWindow : Window
             $"Total: LSL {loan.TotalRepayable:N2} | Balance: LSL {loan.Balance:N2}" +
             (loan.MaturityDate is null ? "" : $" | Maturity: {loan.MaturityDate:dd MMM yyyy}");
         SelectedLoanContractStatus.Text =
-            "Loan selected. Contract retrieval requires a verified, tenant-authorized LoanHub download endpoint. No signing is enabled.";
+            "Loan selected. Contract discovery is locked until the authenticated Wacom workstation session is integrated. No signing is enabled.";
     }
 
     private void ReviewSelectedLoanContract_Click(object sender, RoutedEventArgs e)
