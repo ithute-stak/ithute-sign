@@ -207,8 +207,10 @@ public sealed partial class MainWindow : Window
             return;
         }
         SelectedLoanContractStatus.Text =
-            "Contract preview is pending verification of the LoanHub document endpoint. " +
-            "No file was downloaded and no signing status was changed.";
+            "LoanHub requires an authenticated workstation session and a prepared document intent " +
+            "before GET /wacom-document-intents/{intent_id}/source-pdf can be used. " +
+            "Select the borrower contract through the authorized Wacom contract workflow. " +
+            "No PDF was downloaded and no signing status was changed.";
     }
 
     private async void ContractPreflight_Click(object sender, RoutedEventArgs e)
