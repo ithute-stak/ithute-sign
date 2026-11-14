@@ -173,7 +173,14 @@ public sealed partial class MainWindow : Window
 
     private void CompanyLoansList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        _selectedLoan = CompanyLoansList.SelectedItem as CompanyLoanRow;
+        var candidate = CompanyLoansList.SelectedItem as CompanyLoanRow;
+        // A UI row is not an authorization source. Require a current server-loaded
+        // loan from the authenticated tenant before enabling contract review.
+        _selectedLoan = candidate is not null &&
+            _loanHubSession?.IsAuthenticated == true &&
+            _loanHubSession.CompanyId == candidate.CompanyId &&
+            _companyLoans.Any(loan => ReferenceEquals(loan, candidate))
+            ? candidate : null;
         ReviewSelectedLoanContract.IsEnabled = _selectedLoan is not null;
         if (_selectedLoan is not { } loan)
         {
@@ -193,7 +200,8 @@ public sealed partial class MainWindow : Window
     private void ReviewSelectedLoanContract_Click(object sender, RoutedEventArgs e)
     {
         if (_selectedLoan is null || _loanHubSession?.IsAuthenticated != true ||
-            _loanHubSession.CompanyId != _selectedLoan.CompanyId)
+            _loanHubSession.CompanyId != _selectedLoan.CompanyId ||
+            !_companyLoans.Any(loan => ReferenceEquals(loan, _selectedLoan)))
         {
             SelectedLoanContractStatus.Text = "Select an authorized company loan after logging in.";
             return;
