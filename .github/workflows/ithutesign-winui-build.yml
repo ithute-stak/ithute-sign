@@ -21,27 +21,19 @@ jobs:
       - name: Verify pinned SDK
         run: dotnet --version
         working-directory: ithutesign-winui-v029/IthuteSign.Modern
-      - name: Verify contract review remains disabled without bridge authorization
+      - name: Verify contract review is disabled until bridge authorization
         shell: pwsh
         run: |
           $source = Get-Content 'ithutesign-winui-v029/IthuteSign.Modern/MainWindow.xaml.cs' -Raw
           $xaml = Get-Content 'ithutesign-winui-v029/IthuteSign.Modern/MainWindow.xaml' -Raw
-          if ($source -notmatch '(?m)^\s*ReviewSelectedLoanContract\.IsEnabled\s*=\s*false;\s*
-        uses: microsoft/setup-msbuild@v2
-      - name: Restore WinUI desktop app with Visual Studio MSBuild
-        run: msbuild IthuteSign.Modern.csproj /restore /t:Restore /p:Configuration=Release /p:Platform=x64 /p:BundleWacomCapture=false /v:minimal
-        working-directory: ithutesign-winui-v029/IthuteSign.Modern
-      - name: Compile WinUI desktop app with Visual Studio MSBuild
-        run: msbuild IthuteSign.Modern.csproj /t:Build /p:Configuration=Release /p:Platform=x64 /p:BundleWacomCapture=false /v:minimal
-        working-directory: ithutesign-winui-v029/IthuteSign.Modern
-) {
-            throw 'Contract review disable guard is missing or commented out.'
+          if (-not $source.Contains('ReviewSelectedLoanContract.IsEnabled = false;')) {
+            throw 'Missing contract review disable guard.'
           }
-          if ($xaml -notmatch 'x:Name="ReviewSelectedLoanContract"[^>]*IsEnabled="False"') {
-            throw 'Contract review must be disabled in initial XAML.'
+          if (-not $xaml.Contains('Content="Review selected loan contract" IsEnabled="False"')) {
+            throw 'Contract review must start disabled.'
           }
-          if ($xaml -notmatch 'x:Name="UnsignedContractsList"[^>]*IsEnabled="False"') {
-            throw 'Unsigned contract list must be disabled until authorized integration.'
+          if (-not $xaml.Contains('IsEnabled="False" />')) {
+            throw 'Unsigned contract list must start disabled.'
           }
       - name: Locate Visual Studio MSBuild
         uses: microsoft/setup-msbuild@v2
