@@ -148,6 +148,7 @@ public sealed partial class MainWindow : Window
     {
         _selectedLoan = null;
         ReviewSelectedLoanContract.IsEnabled = false;
+        OpenSelectedLoanInSecureDesk.IsEnabled = false;
         UnsignedContractsList.ItemsSource = null;
         UnsignedContractsStatus.Text = "No authorized contract lookup has completed.";
         CompanyLoanDetails.Text = "Select a loan to review its details.";
@@ -188,6 +189,7 @@ public sealed partial class MainWindow : Window
         // contract discovery disabled until the authenticated connector supplies
         // a scoped session through an approved integration.
         ReviewSelectedLoanContract.IsEnabled = false;
+        OpenSelectedLoanInSecureDesk.IsEnabled = _selectedLoan is not null;
         UnsignedContractsList.ItemsSource = null;
         UnsignedContractsStatus.Text = "Contract choices cleared. Authenticated workstation lookup is required.";
         if (_selectedLoan is not { } loan)
@@ -203,6 +205,24 @@ public sealed partial class MainWindow : Window
             (loan.MaturityDate is null ? "" : $" | Maturity: {loan.MaturityDate:dd MMM yyyy}");
         SelectedLoanContractStatus.Text =
             "Loan selected. Contract discovery is locked until the authenticated Wacom workstation session is integrated. No signing is enabled.";
+    }
+
+    private async void OpenSelectedLoanInSecureDesk_Click(object sender, RoutedEventArgs e)
+    {
+        // Navigate only to the connector-owned authenticated desk. Do not put
+        // borrower IDs, bearer credentials, or bridge tokens in localhost URLs.
+        if (_selectedLoan is not { } loan ||
+            _loanHubSession?.IsAuthenticated != true ||
+            _loanHubSession.CompanyId != loan.CompanyId ||
+            !_companyLoans.Any(item => ReferenceEquals(item, loan)))
+        {
+            SelectedLoanContractStatus.Text = "Log in and select an authorized company loan first.";
+            OpenSelectedLoanInSecureDesk.IsEnabled = false;
+            return;
+        }
+        SelectedLoanContractStatus.Text =
+            "Opening the separate authenticated Wacom desk. Select and verify the borrower again inside the desk; no loan identity or credentials were transferred.";
+        OpenEmbeddedWorkstationDesk_Click(sender, e);
     }
 
     private void ReviewSelectedLoanContract_Click(object sender, RoutedEventArgs e)
