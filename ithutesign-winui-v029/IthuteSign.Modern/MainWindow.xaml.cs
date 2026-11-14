@@ -416,8 +416,11 @@ public sealed partial class MainWindow : Window
                 EmbeddedDesk.CoreWebView2.Settings.IsWebMessageEnabled = false;
                 _embeddedDeskReady = true;
             }
+            // WebView2 must never retain an earlier authenticated desk when a
+            // new local connector session is opened. The connector continues
+            // to own its own cookie, CSRF, and workstation authentication.
             EmbeddedDeskPanel.Visibility = Visibility.Visible;
-            EmbeddedDesk.Source = new Uri("http://127.0.0.1:8767/");
+            EmbeddedDesk.CoreWebView2.Navigate("http://127.0.0.1:8767/");
             EmbeddedDeskStatus.Text =
                 "LoanHub connector desk opened locally. Sign in inside this desk and complete enrolled-device verification. Evidence review is not contract signing.";
         }
