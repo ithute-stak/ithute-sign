@@ -195,7 +195,7 @@ public sealed class LoanHubSession : IDisposable
             throw new UnauthorizedAccessException("Authenticated company and borrower are required.");
         if (string.IsNullOrWhiteSpace(bridgeSessionToken) ||
             bridgeSessionToken.Length > 4096 ||
-            bridgeSessionToken.Any(char.IsControl))
+            bridgeSessionToken.Any(ch => ch < 0x21 || ch > 0x7e))
             throw new UnauthorizedAccessException("A valid authenticated Wacom bridge session is required.");
         using var request = new HttpRequestMessage(HttpMethod.Get,
             $"api/v1/wacom-document-intents/borrowers/{borrowerId:D}/eligible-contracts");
