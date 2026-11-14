@@ -95,6 +95,9 @@ public sealed partial class MainWindow : Window
             LoanHubLoginStatus.Text = "Connecting to LoanHub...";
             _loanHubSession?.Dispose();
             _loanHubSession = null;
+            ClearSelectedLoan("Log in and select an authorized company loan.");
+            _companyLoans = Array.Empty<CompanyLoanRow>();
+            CompanyLoansList.ItemsSource = null;
             var session = new LoanHubSession(new Uri("https://api.loanhub.co.ls/", UriKind.Absolute));
             try
             {
@@ -124,6 +127,7 @@ public sealed partial class MainWindow : Window
     {
         if (_loanHubSession is null || !_loanHubSession.IsAuthenticated || _loansLoading) return;
         _loansLoading = true;
+        ClearSelectedLoan("Refreshing company loans. Select a loan after the refresh completes.");
         CompanyLoansStatus.Text = "Loading company loans...";
         try
         {
@@ -133,13 +137,19 @@ public sealed partial class MainWindow : Window
         catch (Exception ex)
         {
             _companyLoans = Array.Empty<CompanyLoanRow>();
-            _selectedLoan = null;
-            ReviewSelectedLoanContract.IsEnabled = false;
-            SelectedLoanContractStatus.Text = "Loans unavailable. No contract can be retrieved.";
+            ClearSelectedLoan("Loans unavailable. No contract can be retrieved.");
             CompanyLoansList.ItemsSource = null;
             CompanyLoansStatus.Text = "Unable to load company loans: " + ex.Message;
         }
         finally { _loansLoading = false; }
+    }
+
+    private void ClearSelectedLoan(string status)
+    {
+        _selectedLoan = null;
+        ReviewSelectedLoanContract.IsEnabled = false;
+        CompanyLoanDetails.Text = "Select a loan to review its details.";
+        SelectedLoanContractStatus.Text = status;
     }
 
     private void FilterCompanyLoans()
@@ -150,6 +160,8 @@ public sealed partial class MainWindow : Window
             (loan.FolioNumber?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false) ||
             (loan.LoanReference?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false) ||
             (loan.Status?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false)).ToArray();
+        if (_selectedLoan is not null && !filtered.Contains(_selectedLoan))
+            ClearSelectedLoan("Selection cleared because the loan is no longer in the current list.");
         CompanyLoansList.ItemsSource = filtered;
         CompanyLoansStatus.Text = $"Showing {filtered.Length} of {_companyLoans.Count} company loans.";
     }
@@ -436,8 +448,8 @@ public sealed partial class MainWindow : Window
         _loanHubSession?.Dispose();
         _loanHubSession = null;
         _companyLoans = Array.Empty<CompanyLoanRow>();
+        ClearSelectedLoan("Logged out. No contract is available.");
         CompanyLoansList.ItemsSource = null;
-        CompanyLoanDetails.Text = "";
         CompanyLoansStatus.Text = "Log in to load company loans.";
         LoanHubPassword.Password = "";
         LoanHubOtp.Password = "";
