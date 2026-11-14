@@ -210,9 +210,15 @@ public sealed class LoanHubSession : IDisposable
             cancellationToken: cancellationToken);
         if (payload is null || payload.BorrowerId != borrowerId || payload.SigningAuthorized ||
             payload.ContractSigned || payload.Contracts is null ||
+            payload.Contracts.Count > 50 ||
+            payload.Contracts.Select(row => row.ContractId).Distinct().Count() != payload.Contracts.Count ||
             payload.Contracts.Any(row => row.BorrowerId != borrowerId ||
                 row.ContractId == Guid.Empty || row.SourceFileId == Guid.Empty ||
-                string.IsNullOrWhiteSpace(row.DocumentVersion)))
+                string.IsNullOrWhiteSpace(row.DocumentVersion) ||
+                row.DocumentVersion.Length > 80 ||
+                row.DocumentVersion.Any(char.IsControl) ||
+                (row.ContractNumber is not null &&
+                    (row.ContractNumber.Length > 256 || row.ContractNumber.Any(char.IsControl)))))
             throw new InvalidOperationException("LoanHub returned invalid or unscoped contract choices.");
         return payload.Contracts;
     }
