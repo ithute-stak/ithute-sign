@@ -184,6 +184,39 @@ public sealed class LoanHubSession : IDisposable
         throw new InvalidOperationException("Loan listing exceeded 10,000 records. Pagination support is required.");
     }
 
+    /// <summary>
+    /// Discover unsigned contracts only with an already authenticated Wacom
+    /// bridge session. Never substitute the employee bearer token for device proof.
+    /// </summary>
+    public async Task<IReadOnlyList<EligibleContractRow>> GetEligibleContractsAsync(
+        Guid borrowerId, string bridgeSessionToken, CancellationToken cancellationToken = default)
+    {
+        if (!IsAuthenticated || CompanyId is null || borrowerId == Guid.Empty)
+            throw new UnauthorizedAccessException("Authenticated company and borrower are required.");
+        if (string.IsNullOrWhiteSpace(bridgeSessionToken) ||
+            bridgeSessionToken.Length > 4096 ||
+            bridgeSessionToken.Any(char.IsControl))
+            throw new UnauthorizedAccessException("A valid authenticated Wacom bridge session is required.");
+        using var request = new HttpRequestMessage(HttpMethod.Get,
+            $"api/v1/wacom-document-intents/borrowers/{borrowerId:D}/eligible-contracts");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _token);
+        request.Headers.Add("X-Company-ID", CompanyId.Value.ToString("D"));
+        request.Headers.Add("X-Wacom-Bridge-Session", bridgeSessionToken);
+        using var response = await _http.SendAsync(request, cancellationToken);
+        if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+            throw new UnauthorizedAccessException("LoanHub denied contract discovery for this operator or workstation.");
+        response.EnsureSuccessStatusCode();
+        var payload = await response.Content.ReadFromJsonAsync<EligibleContractsPayload>(
+            cancellationToken: cancellationToken);
+        if (payload is null || payload.BorrowerId != borrowerId || payload.SigningAuthorized ||
+            payload.ContractSigned || payload.Contracts is null ||
+            payload.Contracts.Any(row => row.BorrowerId != borrowerId ||
+                row.ContractId == Guid.Empty || row.SourceFileId == Guid.Empty ||
+                string.IsNullOrWhiteSpace(row.DocumentVersion)))
+            throw new InvalidOperationException("LoanHub returned invalid or unscoped contract choices.");
+        return payload.Contracts;
+    }
+
     public void Logout() { _token = null; User = null; CompanyId = null; }
     public void Dispose() { Logout(); _http.Dispose(); }
 
@@ -246,4 +279,21 @@ public sealed class CompanyLoanRow
         $"{FolioNumber ?? LoanReference}   |   {LoanReference}   |   {Status}   |   " +
         $"Principal LSL {Principal:N2}   |   Balance LSL {Balance:N2}" +
         (IsTopUp ? "   |   TOP-UP" : "");
+}
+
+public sealed class EligibleContractsPayload
+{
+    [JsonPropertyName("borrower_id")] public Guid BorrowerId { get; set; }
+    [JsonPropertyName("contracts")] public List<EligibleContractRow>? Contracts { get; set; }
+    [JsonPropertyName("signing_authorized")] public bool SigningAuthorized { get; set; }
+    [JsonPropertyName("contract_signed")] public bool ContractSigned { get; set; }
+}
+
+public sealed class EligibleContractRow
+{
+    [JsonPropertyName("borrower_id")] public Guid BorrowerId { get; set; }
+    [JsonPropertyName("contract_id")] public Guid ContractId { get; set; }
+    [JsonPropertyName("contract_number")] public string? ContractNumber { get; set; }
+    [JsonPropertyName("source_file_id")] public Guid SourceFileId { get; set; }
+    [JsonPropertyName("document_version")] public string? DocumentVersion { get; set; }
 }
