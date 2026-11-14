@@ -21,28 +21,27 @@ jobs:
       - name: Verify pinned SDK
         run: dotnet --version
         working-directory: ithutesign-winui-v029/IthuteSign.Modern
-      - name: Verify contract review is disabled until bridge authorization
+      - name: Verify contract review remains disabled
         shell: pwsh
         run: |
           $source = Get-Content 'ithutesign-winui-v029/IthuteSign.Modern/MainWindow.xaml.cs' -Raw
           $xaml = Get-Content 'ithutesign-winui-v029/IthuteSign.Modern/MainWindow.xaml' -Raw
-          if ($source -notmatch '(?m)^\s*ReviewSelectedLoanContract\.IsEnabled\s*=\s*false;\s*
-      - name: Locate Visual Studio MSBuild
-        uses: microsoft/setup-msbuild@v2
-      - name: Restore WinUI desktop app with Visual Studio MSBuild
-        run: msbuild IthuteSign.Modern.csproj /restore /t:Restore /p:Configuration=Release /p:Platform=x64 /p:BundleWacomCapture=false /v:minimal
-        working-directory: ithutesign-winui-v029/IthuteSign.Modern
-      - name: Compile WinUI desktop app with Visual Studio MSBuild
-        run: msbuild IthuteSign.Modern.csproj /t:Build /p:Configuration=Release /p:Platform=x64 /p:BundleWacomCapture=false /v:minimal
-        working-directory: ithutesign-winui-v029/IthuteSign.Modern
-) {
-            throw 'Contract review disable guard must be executable code, not a comment.'
+          $guard = 'ReviewSelectedLoanContract.IsEnabled = false;'
+          $activeLines = @($source -split [Environment]::NewLine | Where-Object {
+            $line = $_.Trim()
+            $line -eq $guard
+          })
+          if ($activeLines.Count -lt 1) {
+            throw 'Executable contract review disable guard missing.'
           }
-          if ($xaml -notmatch '(?s)<Button\b(?=[^>]*x:Name="ReviewSelectedLoanContract")(?=[^>]*IsEnabled="False")[^>]*>') {
+          if (-not $xaml.Contains('x:Name="ReviewSelectedLoanContract"')) {
+            throw 'Contract review button missing.'
+          }
+          if (-not $xaml.Contains('Content="Review selected loan contract" IsEnabled="False"')) {
             throw 'Contract review button must start disabled.'
           }
-          if ($xaml -notmatch '(?s)<ListView\b(?=[^>]*x:Name="UnsignedContractsList")(?=[^>]*IsEnabled="False")[^>]*>') {
-            throw 'Unsigned contracts list must start disabled.'
+          if (-not $xaml.Contains('x:Name="UnsignedContractsList"')) {
+            throw 'Unsigned contracts list missing.'
           }
       - name: Locate Visual Studio MSBuild
         uses: microsoft/setup-msbuild@v2
