@@ -16,6 +16,7 @@ public sealed partial class MainWindow : Window
     private LoanHubSession? _loanHubSession;
     private IReadOnlyList<CompanyLoanRow> _companyLoans = Array.Empty<CompanyLoanRow>();
     private bool _loansLoading;
+    private CompanyLoanRow? _selectedLoan;
 
     private async void TestWacom_Click(object sender, RoutedEventArgs e)
     {
@@ -132,6 +133,9 @@ public sealed partial class MainWindow : Window
         catch (Exception ex)
         {
             _companyLoans = Array.Empty<CompanyLoanRow>();
+            _selectedLoan = null;
+            ReviewSelectedLoanContract.IsEnabled = false;
+            SelectedLoanContractStatus.Text = "Loans unavailable. No contract can be retrieved.";
             CompanyLoansList.ItemsSource = null;
             CompanyLoansStatus.Text = "Unable to load company loans: " + ex.Message;
         }
@@ -157,11 +161,34 @@ public sealed partial class MainWindow : Window
 
     private void CompanyLoansList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (CompanyLoansList.SelectedItem is CompanyLoanRow loan)
-            CompanyLoanDetails.Text = $"Loan: {loan.FolioNumber} | Reference: {loan.LoanReference} | " +
-                $"Status: {loan.Status} | Principal: LSL {loan.Principal:N2} | " +
-                $"Total: LSL {loan.TotalRepayable:N2} | Balance: LSL {loan.Balance:N2}" +
-                (loan.MaturityDate is null ? "" : $" | Maturity: {loan.MaturityDate:dd MMM yyyy}");
+        _selectedLoan = CompanyLoansList.SelectedItem as CompanyLoanRow;
+        ReviewSelectedLoanContract.IsEnabled = _selectedLoan is not null;
+        if (_selectedLoan is not { } loan)
+        {
+            CompanyLoanDetails.Text = "Select a loan to review its details.";
+            SelectedLoanContractStatus.Text = "No loan selected.";
+            return;
+        }
+        CompanyLoanDetails.Text =
+            $"Folio: {loan.FolioNumber ?? "Not supplied"} | Reference: {loan.LoanReference ?? "Not supplied"} | " +
+            $"Status: {loan.Status ?? "Not supplied"} | Principal: LSL {loan.Principal:N2} | " +
+            $"Total: LSL {loan.TotalRepayable:N2} | Balance: LSL {loan.Balance:N2}" +
+            (loan.MaturityDate is null ? "" : $" | Maturity: {loan.MaturityDate:dd MMM yyyy}");
+        SelectedLoanContractStatus.Text =
+            "Loan selected. Contract retrieval requires a verified, tenant-authorized LoanHub download endpoint. No signing is enabled.";
+    }
+
+    private void ReviewSelectedLoanContract_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedLoan is null || _loanHubSession?.IsAuthenticated != true ||
+            _loanHubSession.CompanyId != _selectedLoan.CompanyId)
+        {
+            SelectedLoanContractStatus.Text = "Select an authorized company loan after logging in.";
+            return;
+        }
+        SelectedLoanContractStatus.Text =
+            "Contract preview is pending verification of the LoanHub document endpoint. " +
+            "No file was downloaded and no signing status was changed.";
     }
 
     private async void ContractPreflight_Click(object sender, RoutedEventArgs e)
