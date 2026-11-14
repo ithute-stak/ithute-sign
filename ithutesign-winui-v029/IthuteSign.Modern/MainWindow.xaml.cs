@@ -148,6 +148,8 @@ public sealed partial class MainWindow : Window
     {
         _selectedLoan = null;
         ReviewSelectedLoanContract.IsEnabled = false;
+        UnsignedContractsList.ItemsSource = null;
+        UnsignedContractsStatus.Text = "No authorized contract lookup has completed.";
         CompanyLoanDetails.Text = "Select a loan to review its details.";
         SelectedLoanContractStatus.Text = status;
     }
@@ -179,9 +181,12 @@ public sealed partial class MainWindow : Window
         _selectedLoan = candidate is not null &&
             _loanHubSession?.IsAuthenticated == true &&
             _loanHubSession.CompanyId == candidate.CompanyId &&
+            candidate.Id != Guid.Empty && candidate.BorrowerId != Guid.Empty &&
             _companyLoans.Any(loan => ReferenceEquals(loan, candidate))
             ? candidate : null;
         // A selected loan alone is not a verified Wacom bridge session. Keep\n        // contract discovery disabled until the authenticated connector supplies\n        // a scoped session through an approved integration.\n        ReviewSelectedLoanContract.IsEnabled = false;
+        UnsignedContractsList.ItemsSource = null;
+        UnsignedContractsStatus.Text = "Contract choices cleared. Authenticated workstation lookup is required.";
         if (_selectedLoan is not { } loan)
         {
             CompanyLoanDetails.Text = "Select a loan to review its details.";
