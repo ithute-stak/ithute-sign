@@ -63,6 +63,7 @@
                                     <TextBlock x:Name="CompanyLoanDetails" Text="Select a loan to review its details." TextWrapping="Wrap" />
                                     <TextBlock x:Name="SelectedLoanContractStatus" Text="No loan selected. Contract retrieval awaits a verified LoanHub API." TextWrapping="Wrap" />
                                     <Button x:Name="ReviewSelectedLoanContract" Content="Review selected loan contract" IsEnabled="False" Click="ReviewSelectedLoanContract_Click" HorizontalAlignment="Left" />
+                                    <Button x:Name="OpenSelectedLoanInSecureDesk" Content="Open secure Wacom contract desk" IsEnabled="False" Click="OpenSelectedLoanInSecureDesk_Click" HorizontalAlignment="Left" />
                                 </StackPanel>
                             </Border>
                         </StackPanel>
