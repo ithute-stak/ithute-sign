@@ -483,6 +483,10 @@ public sealed partial class MainWindow : Window
     {
         // Block navigation to any external site, loopback aliases, or other ports.
         // The embedded page uses the Go connector's existing cookie and CSRF session.
+        // Allow only the internal blank document used to clear the desk on logout.
+        // No other non-loopback navigation is permitted.
+        if (string.Equals(args.Uri, "about:blank", StringComparison.OrdinalIgnoreCase))
+            return;
         if (!Uri.TryCreate(args.Uri, UriKind.Absolute, out var target) ||
             target.Scheme != Uri.UriSchemeHttp ||
             target.Host != "127.0.0.1" || target.Port != 8767 ||
