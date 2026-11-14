@@ -347,8 +347,16 @@ public sealed partial class MainWindow : Window
             if (response.StatusCode != System.Net.HttpStatusCode.OK ||
                 !string.Equals(contentType, "text/html", StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException("Unexpected local connector response.");
+            var bundledConnector = Path.Combine(AppContext.BaseDirectory,
+                "wacom-connector", "loanhub-wacom-connector.exe");
+            var packageStatus = File.Exists(bundledConnector)
+                ? "Packaged connector executable detected."
+                : "No packaged connector executable detected; an independently installed connector may be running.";
             LocalConnectorStatus.Text =
-                "Local workstation desk is reachable. Open it to log in and complete device verification. Signing remains disabled.";
+                "Local workstation desk responds with HTML. " + packageStatus +
+                " This check cannot verify connector identity, enrolled workstation keys, " +
+                "employee authentication, Wacom SDK availability, or signing authorization. " +
+                "Complete those checks inside the secure desk. Signing remains disabled.";
         }
         catch
         {
