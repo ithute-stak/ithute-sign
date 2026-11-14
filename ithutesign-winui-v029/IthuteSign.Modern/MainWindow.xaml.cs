@@ -469,6 +469,14 @@ public sealed partial class MainWindow : Window
         LoanHubPassword.Password = "";
         LoanHubOtp.Password = "";
         LoanHubLoginStatus.Text = "Logged out. LoanHub signing is unavailable.";
+        // The Go connector owns a separate cookie session. Closing the embedded
+        // view prevents a stale authenticated desk from remaining visible after
+        // the native LoanHub session is cleared. It does not revoke that separate
+        // connector session; operators must log out inside the desk as well.
+        EmbeddedDeskPanel.Visibility = Visibility.Collapsed;
+        if (_embeddedDeskReady && EmbeddedDesk.CoreWebView2 is not null)
+            EmbeddedDesk.CoreWebView2.Navigate("about:blank");
+        EmbeddedDeskStatus.Text = "Native LoanHub session ended. Log out separately inside the local workstation desk.";
         WorkstationStatus.Text = "Workstation not verified. Signing disabled.";
         DeviceChallengeStatus.Text = "Device proof not verified. Signing disabled.";
     }
