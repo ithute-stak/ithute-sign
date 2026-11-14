@@ -18,7 +18,12 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
+      - name: Verify pinned SDK
+        run: dotnet --version
+        working-directory: ithutesign-winui-v029/IthuteSign.Modern
       - name: Restore WinUI desktop app
-        run: dotnet restore ithutesign-winui-v029/IthuteSign.Modern/IthuteSign.Modern.csproj -p:Platform=x64
+        run: dotnet restore IthuteSign.Modern.csproj -p:Platform=x64
+        working-directory: ithutesign-winui-v029/IthuteSign.Modern
       - name: Compile WinUI desktop app
-        run: dotnet build ithutesign-winui-v029/IthuteSign.Modern/IthuteSign.Modern.csproj -c Release -p:Platform=x64 -p:BundleWacomCapture=false --no-restore
+        run: dotnet build IthuteSign.Modern.csproj -c Release -p:Platform=x64 -p:BundleWacomCapture=false --no-restore
+        working-directory: ithutesign-winui-v029/IthuteSign.Modern
