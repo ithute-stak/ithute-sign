@@ -57,7 +57,15 @@
                             <Button Content="Refresh loans" Click="RefreshCompanyLoans_Click" HorizontalAlignment="Left" />
                             <TextBlock x:Name="CompanyLoansStatus" Text="Log in to load company loans." TextWrapping="Wrap" />
                             <ListView x:Name="CompanyLoansList" Height="420" SelectionMode="Single" SelectionChanged="CompanyLoansList_SelectionChanged" />
-                            <TextBlock x:Name="CompanyLoanDetails" TextWrapping="Wrap" />
+                            <Border BorderThickness="1" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" CornerRadius="8" Padding="14">
+                                <StackPanel Spacing="8">
+                                    <TextBlock Text="Selected loan — contract review" FontSize="17" FontWeight="SemiBold" />
+                                    <TextBlock x:Name="CompanyLoanDetails" Text="Select a loan to review its details." TextWrapping="Wrap" />
+                                    <TextBlock x:Name="SelectedLoanContractStatus" Text="No loan selected. Contract retrieval awaits a verified LoanHub API." TextWrapping="Wrap" />
+                                    <Button x:Name="ReviewSelectedLoanContract" Content="Review selected loan contract" IsEnabled="False" Click="ReviewSelectedLoanContract_Click" HorizontalAlignment="Left" />
+                                    <Button x:Name="OpenSelectedLoanInSecureDesk" Content="Open secure Wacom contract desk" IsEnabled="False" Click="OpenSelectedLoanInSecureDesk_Click" HorizontalAlignment="Left" />
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
                     </Border>
                     <StackPanel Spacing="6">

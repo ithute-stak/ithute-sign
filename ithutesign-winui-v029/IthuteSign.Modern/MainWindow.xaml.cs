@@ -16,6 +16,7 @@ public sealed partial class MainWindow : Window
     private LoanHubSession? _loanHubSession;
     private IReadOnlyList<CompanyLoanRow> _companyLoans = Array.Empty<CompanyLoanRow>();
     private bool _loansLoading;
+    private CompanyLoanRow? _selectedLoan;
 
     private async void TestWacom_Click(object sender, RoutedEventArgs e)
     {
@@ -94,6 +95,9 @@ public sealed partial class MainWindow : Window
             LoanHubLoginStatus.Text = "Connecting to LoanHub...";
             _loanHubSession?.Dispose();
             _loanHubSession = null;
+            ClearSelectedLoan("Log in and select an authorized company loan.");
+            _companyLoans = Array.Empty<CompanyLoanRow>();
+            CompanyLoansList.ItemsSource = null;
             var session = new LoanHubSession(new Uri("https://api.loanhub.co.ls/", UriKind.Absolute));
             try
             {
@@ -123,6 +127,7 @@ public sealed partial class MainWindow : Window
     {
         if (_loanHubSession is null || !_loanHubSession.IsAuthenticated || _loansLoading) return;
         _loansLoading = true;
+        ClearSelectedLoan("Refreshing company loans. Select a loan after the refresh completes.");
         CompanyLoansStatus.Text = "Loading company loans...";
         try
         {
@@ -132,10 +137,22 @@ public sealed partial class MainWindow : Window
         catch (Exception ex)
         {
             _companyLoans = Array.Empty<CompanyLoanRow>();
+            ClearSelectedLoan("Loans unavailable. No contract can be retrieved.");
             CompanyLoansList.ItemsSource = null;
             CompanyLoansStatus.Text = "Unable to load company loans: " + ex.Message;
         }
         finally { _loansLoading = false; }
+    }
+
+    private void ClearSelectedLoan(string status)
+    {
+        _selectedLoan = null;
+        ReviewSelectedLoanContract.IsEnabled = false;
+        OpenSelectedLoanInSecureDesk.IsEnabled = false;
+        UnsignedContractsList.ItemsSource = null;
+        UnsignedContractsStatus.Text = "No authorized contract lookup has completed.";
+        CompanyLoanDetails.Text = "Select a loan to review its details.";
+        SelectedLoanContractStatus.Text = status;
     }
 
     private void FilterCompanyLoans()
@@ -146,6 +163,8 @@ public sealed partial class MainWindow : Window
             (loan.FolioNumber?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false) ||
             (loan.LoanReference?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false) ||
             (loan.Status?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false)).ToArray();
+        if (_selectedLoan is not null && !filtered.Contains(_selectedLoan))
+            ClearSelectedLoan("Selection cleared because the loan is no longer in the current list.");
         CompanyLoansList.ItemsSource = filtered;
         CompanyLoansStatus.Text = $"Showing {filtered.Length} of {_companyLoans.Count} company loans.";
     }
@@ -157,11 +176,80 @@ public sealed partial class MainWindow : Window
 
     private void CompanyLoansList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (CompanyLoansList.SelectedItem is CompanyLoanRow loan)
-            CompanyLoanDetails.Text = $"Loan: {loan.FolioNumber} | Reference: {loan.LoanReference} | " +
-                $"Status: {loan.Status} | Principal: LSL {loan.Principal:N2} | " +
-                $"Total: LSL {loan.TotalRepayable:N2} | Balance: LSL {loan.Balance:N2}" +
-                (loan.MaturityDate is null ? "" : $" | Maturity: {loan.MaturityDate:dd MMM yyyy}");
+        var candidate = CompanyLoansList.SelectedItem as CompanyLoanRow;
+        // A UI row is not an authorization source. Require a current server-loaded
+        // loan from the authenticated tenant before enabling contract review.
+        _selectedLoan = candidate is not null &&
+            _loanHubSession?.IsAuthenticated == true &&
+            _loanHubSession.CompanyId == candidate.CompanyId &&
+            candidate.Id != Guid.Empty && candidate.BorrowerId != Guid.Empty &&
+            _companyLoans.Any(loan => ReferenceEquals(loan, candidate))
+            ? candidate : null;
+        // A selected loan alone is not a verified Wacom bridge session. Keep
+        // contract discovery disabled until the authenticated connector supplies
+        // a scoped session through an approved integration.
+        ReviewSelectedLoanContract.IsEnabled = false;
+        OpenSelectedLoanInSecureDesk.IsEnabled = _selectedLoan is not null;
+        UnsignedContractsList.ItemsSource = null;
+        UnsignedContractsStatus.Text = "Contract choices cleared. Authenticated workstation lookup is required.";
+        if (_selectedLoan is not { } loan)
+        {
+            CompanyLoanDetails.Text = "Select a loan to review its details.";
+            SelectedLoanContractStatus.Text = "No loan selected.";
+            return;
+        }
+        CompanyLoanDetails.Text =
+            $"Folio: {loan.FolioNumber ?? "Not supplied"} | Reference: {loan.LoanReference ?? "Not supplied"} | " +
+            $"Status: {loan.Status ?? "Not supplied"} | Principal: LSL {loan.Principal:N2} | " +
+            $"Total: LSL {loan.TotalRepayable:N2} | Balance: LSL {loan.Balance:N2}" +
+            (loan.MaturityDate is null ? "" : $" | Maturity: {loan.MaturityDate:dd MMM yyyy}");
+        SelectedLoanContractStatus.Text =
+            "Loan selected. Contract discovery is locked until the authenticated Wacom workstation session is integrated. No signing is enabled.";
+    }
+
+    private async void OpenSelectedLoanInSecureDesk_Click(object sender, RoutedEventArgs e)
+    {
+        // Navigate only to the connector-owned authenticated desk. Do not put
+        // borrower IDs, bearer credentials, or bridge tokens in localhost URLs.
+        if (_selectedLoan is not { } loan ||
+            _loanHubSession?.IsAuthenticated != true ||
+            _loanHubSession.CompanyId != loan.CompanyId ||
+            !_companyLoans.Any(item => ReferenceEquals(item, loan)))
+        {
+            SelectedLoanContractStatus.Text = "Log in and select an authorized company loan first.";
+            OpenSelectedLoanInSecureDesk.IsEnabled = false;
+            return;
+        }
+        OpenSelectedLoanInSecureDesk.IsEnabled = false;
+        SelectedLoanContractStatus.Text =
+            "Opening the separate authenticated Wacom desk. Select and verify the borrower again inside the desk; no loan identity or credentials were transferred.";
+        try
+        {
+            await OpenEmbeddedWorkstationDeskAsync();
+        }
+        finally
+        {
+            OpenSelectedLoanInSecureDesk.IsEnabled = _selectedLoan is not null &&
+                _loanHubSession?.IsAuthenticated == true &&
+                _loanHubSession.CompanyId == _selectedLoan.CompanyId &&
+                _companyLoans.Any(item => ReferenceEquals(item, _selectedLoan));
+        }
+    }
+
+    private void ReviewSelectedLoanContract_Click(object sender, RoutedEventArgs e)
+    {
+        if (_selectedLoan is null || _loanHubSession?.IsAuthenticated != true ||
+            _loanHubSession.CompanyId != _selectedLoan.CompanyId ||
+            !_companyLoans.Any(loan => ReferenceEquals(loan, _selectedLoan)))
+        {
+            SelectedLoanContractStatus.Text = "Select an authorized company loan after logging in.";
+            return;
+        }
+        SelectedLoanContractStatus.Text =
+            "LoanHub requires an authenticated workstation session and a prepared document intent " +
+            "before GET /wacom-document-intents/{intent_id}/source-pdf can be used. " +
+            "Select the borrower contract through the authorized Wacom contract workflow. " +
+            "No PDF was downloaded and no signing status was changed.";
     }
 
     private async void ContractPreflight_Click(object sender, RoutedEventArgs e)
@@ -259,8 +347,16 @@ public sealed partial class MainWindow : Window
             if (response.StatusCode != System.Net.HttpStatusCode.OK ||
                 !string.Equals(contentType, "text/html", StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException("Unexpected local connector response.");
+            var bundledConnector = Path.Combine(AppContext.BaseDirectory,
+                "wacom-connector", "loanhub-wacom-connector.exe");
+            var packageStatus = File.Exists(bundledConnector)
+                ? "Packaged connector executable detected."
+                : "No packaged connector executable detected; an independently installed connector may be running.";
             LocalConnectorStatus.Text =
-                "Local workstation desk is reachable. Open it to log in and complete device verification. Signing remains disabled.";
+                "Local workstation desk responds with HTML. " + packageStatus +
+                " This check cannot verify connector identity, enrolled workstation keys, " +
+                "employee authentication, Wacom SDK availability, or signing authorization. " +
+                "Complete those checks inside the secure desk. Signing remains disabled.";
         }
         catch
         {
@@ -332,6 +428,11 @@ public sealed partial class MainWindow : Window
 
     private async void OpenEmbeddedWorkstationDesk_Click(object sender, RoutedEventArgs e)
     {
+        await OpenEmbeddedWorkstationDeskAsync();
+    }
+
+    private async Task OpenEmbeddedWorkstationDeskAsync()
+    {
         // The existing Go connector owns the browser session, CSRF protection,
         // employee login, workstation private key, and Wacom SDK operations.
         // No WinUI credentials or bearer tokens are forwarded to localhost.
@@ -362,8 +463,11 @@ public sealed partial class MainWindow : Window
                 EmbeddedDesk.CoreWebView2.Settings.IsWebMessageEnabled = false;
                 _embeddedDeskReady = true;
             }
+            // WebView2 must never retain an earlier authenticated desk when a
+            // new local connector session is opened. The connector continues
+            // to own its own cookie, CSRF, and workstation authentication.
             EmbeddedDeskPanel.Visibility = Visibility.Visible;
-            EmbeddedDesk.Source = new Uri("http://127.0.0.1:8767/");
+            EmbeddedDesk.CoreWebView2.Navigate("http://127.0.0.1:8767/");
             EmbeddedDeskStatus.Text =
                 "LoanHub connector desk opened locally. Sign in inside this desk and complete enrolled-device verification. Evidence review is not contract signing.";
         }
@@ -379,6 +483,10 @@ public sealed partial class MainWindow : Window
     {
         // Block navigation to any external site, loopback aliases, or other ports.
         // The embedded page uses the Go connector's existing cookie and CSRF session.
+        // Allow only the internal blank document used to clear the desk on logout.
+        // No other non-loopback navigation is permitted.
+        if (string.Equals(args.Uri, "about:blank", StringComparison.OrdinalIgnoreCase))
+            return;
         if (!Uri.TryCreate(args.Uri, UriKind.Absolute, out var target) ||
             target.Scheme != Uri.UriSchemeHttp ||
             target.Host != "127.0.0.1" || target.Port != 8767 ||
@@ -409,12 +517,20 @@ public sealed partial class MainWindow : Window
         _loanHubSession?.Dispose();
         _loanHubSession = null;
         _companyLoans = Array.Empty<CompanyLoanRow>();
+        ClearSelectedLoan("Logged out. No contract is available.");
         CompanyLoansList.ItemsSource = null;
-        CompanyLoanDetails.Text = "";
         CompanyLoansStatus.Text = "Log in to load company loans.";
         LoanHubPassword.Password = "";
         LoanHubOtp.Password = "";
         LoanHubLoginStatus.Text = "Logged out. LoanHub signing is unavailable.";
+        // The Go connector owns a separate cookie session. Closing the embedded
+        // view prevents a stale authenticated desk from remaining visible after
+        // the native LoanHub session is cleared. It does not revoke that separate
+        // connector session; operators must log out inside the desk as well.
+        EmbeddedDeskPanel.Visibility = Visibility.Collapsed;
+        if (_embeddedDeskReady && EmbeddedDesk.CoreWebView2 is not null)
+            EmbeddedDesk.CoreWebView2.Navigate("about:blank");
+        EmbeddedDeskStatus.Text = "Native LoanHub session ended. Log out separately inside the local workstation desk.";
         WorkstationStatus.Text = "Workstation not verified. Signing disabled.";
         DeviceChallengeStatus.Text = "Device proof not verified. Signing disabled.";
     }
