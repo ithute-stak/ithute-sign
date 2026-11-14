@@ -222,7 +222,7 @@ public sealed partial class MainWindow : Window
         }
         SelectedLoanContractStatus.Text =
             "Opening the separate authenticated Wacom desk. Select and verify the borrower again inside the desk; no loan identity or credentials were transferred.";
-        OpenEmbeddedWorkstationDesk_Click(sender, e);
+        await OpenEmbeddedWorkstationDeskAsync();
     }
 
     private void ReviewSelectedLoanContract_Click(object sender, RoutedEventArgs e)
@@ -408,6 +408,11 @@ public sealed partial class MainWindow : Window
     private bool _embeddedDeskReady;
 
     private async void OpenEmbeddedWorkstationDesk_Click(object sender, RoutedEventArgs e)
+    {
+        await OpenEmbeddedWorkstationDeskAsync();
+    }
+
+    private async Task OpenEmbeddedWorkstationDeskAsync()
     {
         // The existing Go connector owns the browser session, CSRF protection,
         // employee login, workstation private key, and Wacom SDK operations.
