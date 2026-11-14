@@ -220,9 +220,20 @@ public sealed partial class MainWindow : Window
             OpenSelectedLoanInSecureDesk.IsEnabled = false;
             return;
         }
+        OpenSelectedLoanInSecureDesk.IsEnabled = false;
         SelectedLoanContractStatus.Text =
             "Opening the separate authenticated Wacom desk. Select and verify the borrower again inside the desk; no loan identity or credentials were transferred.";
-        await OpenEmbeddedWorkstationDeskAsync();
+        try
+        {
+            await OpenEmbeddedWorkstationDeskAsync();
+        }
+        finally
+        {
+            OpenSelectedLoanInSecureDesk.IsEnabled = _selectedLoan is not null &&
+                _loanHubSession?.IsAuthenticated == true &&
+                _loanHubSession.CompanyId == _selectedLoan.CompanyId &&
+                _companyLoans.Any(item => ReferenceEquals(item, _selectedLoan));
+        }
     }
 
     private void ReviewSelectedLoanContract_Click(object sender, RoutedEventArgs e)
