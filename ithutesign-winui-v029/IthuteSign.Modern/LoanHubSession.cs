@@ -176,8 +176,9 @@ public sealed class LoanHubSession : IDisposable
             response.EnsureSuccessStatusCode();
             var page = await response.Content.ReadFromJsonAsync<List<CompanyLoanRow>>(cancellationToken: cancellationToken)
                 ?? throw new InvalidOperationException("LoanHub returned an invalid loans response.");
-            if (page.Any(loan => loan.CompanyId != CompanyId.Value))
-                throw new InvalidOperationException("LoanHub returned a loan outside the authenticated company.");
+            if (page.Any(loan => loan.CompanyId != CompanyId.Value ||
+                loan.Id == Guid.Empty || loan.BorrowerId == Guid.Empty))
+                throw new InvalidOperationException("LoanHub returned an invalid or unscoped company loan.");
             result.AddRange(page);
             if (page.Count < pageSize) return result;
         }
