@@ -527,6 +527,15 @@ public sealed partial class MainWindow : Window
         _loanHubSession?.Dispose();
         _loanHubSession = null;
         _companyLoans = Array.Empty<CompanyLoanRow>();
+        // Clear any pending handoff from the previous operator.
+        _pendingDeskBorrowerId = null;
+        _pendingDeskLoanId = null;
+        _deskBorrowerHandoffSubmitted = false;
+        EmbeddedDeskPanel.Visibility = Visibility.Collapsed;
+        if (_embeddedDeskReady)
+            EmbeddedDesk.Source = new Uri("about:blank");
+        EmbeddedDeskStatus.Text = "Desktop session ended. Reauthenticate in the workstation desk.";
+        SelectedLoanDeskStatus.Text = "Log in and select an authorized company loan.";
         CompanyLoansList.ItemsSource = null;
         OpenSelectedLoanDesk.IsEnabled = false;
         CompanyLoanDetails.Text = "";
