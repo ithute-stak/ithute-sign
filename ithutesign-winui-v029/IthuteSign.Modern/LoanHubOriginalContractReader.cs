@@ -42,6 +42,18 @@ public sealed class LoanHubOriginalContractReader
         request.Headers.Add("X-Wacom-Bridge-Session", bridgeSession);
         request.Headers.CacheControl = new CacheControlHeaderValue { NoStore = true };
         using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        // An injected HttpClient may follow redirects. Never accept a PDF from
+        // another origin, even if it returns the expected hash and media type.
+        var finalUri = response.RequestMessage?.RequestUri;
+        var approvedOrigin = _http.BaseAddress!;
+        if (finalUri is null || finalUri.Scheme != Uri.UriSchemeHttps ||
+            !string.Equals(finalUri.Host, approvedOrigin.Host, StringComparison.OrdinalIgnoreCase) ||
+            finalUri.Port != approvedOrigin.Port ||
+            !finalUri.AbsolutePath.Equals(
+                new Uri(approvedOrigin, $"api/v1/wacom-document-intents/{intent.IntentId:D}/source-pdf").AbsolutePath,
+                StringComparison.Ordinal) ||
+            !string.IsNullOrEmpty(finalUri.Query) || !string.IsNullOrEmpty(finalUri.Fragment))
+            throw new UnauthorizedAccessException("Original contract response was redirected or changed origin.");
         if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
             throw new UnauthorizedAccessException("LoanHub rejected original-document access.");
         response.EnsureSuccessStatusCode();
