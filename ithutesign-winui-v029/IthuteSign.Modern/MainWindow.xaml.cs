@@ -16,6 +16,8 @@ public sealed partial class MainWindow : Window
     private LoanHubSession? _loanHubSession;
     private IReadOnlyList<CompanyLoanRow> _companyLoans = Array.Empty<CompanyLoanRow>();
     private bool _loansLoading;
+    private Guid? _pendingDeskBorrowerId;
+    private bool _deskBorrowerHandoffSubmitted;
 
     private void CheckOfflineRecoveryReadiness_Click(object sender, RoutedEventArgs e)
     {
@@ -223,7 +225,14 @@ public sealed partial class MainWindow : Window
         }
         // The connector authenticates independently. Never send loan IDs,
         // credentials, or bridge session tokens through a localhost URL.
-        SelectedLoanDeskStatus.Text = "Opening secure Wacom desk. Select the borrower again inside the desk.";
+        if (!Guid.TryParse(loan.BorrowerId.ToString(), out var borrowerId))
+        {
+            SelectedLoanDeskStatus.Text = "Selected loan has no valid borrower ID.";
+            return;
+        }
+        _pendingDeskBorrowerId = borrowerId;
+        _deskBorrowerHandoffSubmitted = false;
+        SelectedLoanDeskStatus.Text = "Opening Wacom desk. Sign in there if requested; selected borrower will load automatically.";
         OpenEmbeddedWorkstationDesk_Click(sender, e);
     }
 
@@ -435,6 +444,46 @@ public sealed partial class MainWindow : Window
             EmbeddedDeskPanel.Visibility = Visibility.Collapsed;
             EmbeddedDeskStatus.Text = "Local signing desk unavailable. Signing disabled.";
             ShowError("Start the approved Go Wacom connector with --pc-ui and enrolled workstation keys. " + ex.Message);
+        }
+    }
+
+    private async void EmbeddedDesk_NavigationCompleted(WebView2 sender, CoreWebView2NavigationCompletedEventArgs args)
+    {
+        if (!args.IsSuccess || _deskBorrowerHandoffSubmitted || _pendingDeskBorrowerId is not Guid borrowerId)
+            return;
+        var loan = CompanyLoansList.SelectedItem as CompanyLoanRow;
+        if (_loanHubSession?.IsAuthenticated != true || loan is null ||
+            loan.CompanyId != _loanHubSession.CompanyId ||
+            !_companyLoans.Any(row => ReferenceEquals(row, loan)) ||
+            !Guid.TryParse(loan.BorrowerId.ToString(), out var selectedId) ||
+            selectedId != borrowerId)
+        {
+            _pendingDeskBorrowerId = null;
+            return;
+        }
+        // Only submit the connector's own CSRF-protected form inside its authenticated
+        // same-origin WebView. Never transmit bearer tokens or credentials to localhost.
+        const string origin = "http://127.0.0.1:8767/";
+        if (sender.Source?.GetLeftPart(UriPartial.Authority) != origin.TrimEnd('/'))
+            return;
+        var script = "(function(){const f=document.querySelector('form[action=\\\"/lookup-borrower\\\"]');" +
+            "if(!f)return false;const i=f.querySelector('input[name=\\\"borrower_id\\\"]');" +
+            "if(!i)return false;i.value=" + JsonSerializer.Serialize(borrowerId.ToString()) +
+            ";f.requestSubmit();return true;})()";
+        try
+        {
+            // Mark before submit to avoid repeating the lookup on the resulting navigation.
+            var submitted = await sender.ExecuteScriptAsync(script);
+            if (submitted == "true")
+            {
+                _deskBorrowerHandoffSubmitted = true;
+                _pendingDeskBorrowerId = null;
+                SelectedLoanDeskStatus.Text = "Selected borrower sent to the authenticated Wacom desk. Verify the exact contract before capture.";
+            }
+        }
+        catch (Exception)
+        {
+            SelectedLoanDeskStatus.Text = "Automatic borrower selection unavailable; select borrower inside the Wacom desk.";
         }
     }
 
