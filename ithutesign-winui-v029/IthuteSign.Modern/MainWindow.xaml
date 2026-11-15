@@ -89,6 +89,14 @@
                                        TextWrapping="Wrap" />
                         </StackPanel>
                     </Border>
+                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="14" Padding="20">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="Offline evidence recovery" FontSize="20" FontWeight="SemiBold" />
+                            <TextBlock Text="Recovery is read-only until a protected workstation key and verified operator authorization are available. No automatic upload or contract finalization is enabled." TextWrapping="Wrap" />
+                            <TextBlock x:Name="OfflineRecoveryStatusText" Text="Offline recovery is not configured on this workstation. Pending evidence has not been inspected." TextWrapping="Wrap" />
+                            <Button Content="Check recovery readiness" Click="CheckOfflineRecoveryReadiness_Click" HorizontalAlignment="Left" />
+                        </StackPanel>
+                    </Border>
                     <!-- Legacy arbitrary-file workflow is not part of LoanHub signing. -->
                     <StackPanel Visibility="Collapsed">
                     <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
