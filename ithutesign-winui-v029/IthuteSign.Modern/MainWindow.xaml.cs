@@ -15,7 +15,7 @@ public sealed partial class MainWindow : Window
     private readonly List<string> _recent = new();
     private LoanHubSession? _loanHubSession;
     private IReadOnlyList<CompanyLoanRow> _companyLoans = Array.Empty<CompanyLoanRow>();
-    private bool _loansLoading;
+    private LoanHubSession? _loansLoadingSession;
     private Guid? _pendingDeskBorrowerId;
     private Guid? _pendingDeskLoanId;
     private bool _deskBorrowerHandoffSubmitted;
@@ -128,6 +128,7 @@ public sealed partial class MainWindow : Window
             SelectedLoanDeskStatus.Text = "Log in and select an authorized company loan.";
             _loanHubSession?.Dispose();
             _loanHubSession = null;
+            _loansLoadingSession = null;
             var session = new LoanHubSession(new Uri("https://api.loanhub.co.ls/", UriKind.Absolute));
             try
             {
@@ -164,10 +165,11 @@ public sealed partial class MainWindow : Window
 
     private async Task RefreshCompanyLoansAsync()
     {
-        if (_loanHubSession is null || !_loanHubSession.IsAuthenticated || _loansLoading) return;
+        if (_loanHubSession is null || !_loanHubSession.IsAuthenticated) return;
         var session = _loanHubSession;
+        if (ReferenceEquals(_loansLoadingSession, session)) return;
         var companyId = session.CompanyId;
-        _loansLoading = true;
+        _loansLoadingSession = session;
         CompanyLoansStatus.Text = "Loading company loans...";
         try
         {
@@ -192,7 +194,12 @@ public sealed partial class MainWindow : Window
             SelectedLoanContractContext.Text = "Select a loan to see its borrower and contract context.";
             CompanyLoansStatus.Text = "Unable to load company loans: " + ex.Message;
         }
-        finally { _loansLoading = false; }
+        finally
+        {
+            // An old operator's request cannot clear the new session's loading state.
+            if (ReferenceEquals(_loansLoadingSession, session))
+                _loansLoadingSession = null;
+        }
     }
 
     private void FilterCompanyLoans()
@@ -551,6 +558,7 @@ public sealed partial class MainWindow : Window
         ++_loginGeneration;
         _loanHubSession?.Dispose();
         _loanHubSession = null;
+        _loansLoadingSession = null;
         _companyLoans = Array.Empty<CompanyLoanRow>();
         // Clear any pending handoff from the previous operator.
         _pendingDeskBorrowerId = null;
