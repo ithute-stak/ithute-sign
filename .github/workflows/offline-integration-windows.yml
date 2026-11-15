@@ -3,12 +3,14 @@ on:
   pull_request:
     paths:
       - 'offline-integration/**'
+      - 'ithutesign-winui-v029/**'
       - '.github/workflows/offline-integration-windows.yml'
   push:
     branches:
       - main
     paths:
       - 'offline-integration/**'
+      - 'ithutesign-winui-v029/**'
       - '.github/workflows/offline-integration-windows.yml'
 jobs:
   offline-tests:
