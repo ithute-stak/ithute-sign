@@ -22,6 +22,12 @@ public static class OfflineRecoveryPreflight
         if (workstationKey is null || workstationKey.Length != 32)
             throw new ArgumentException("Protected 256-bit workstation key is required.");
 
+        // Read-only means no directory creation, even when recovery has never
+        // been configured. Constructors below create their roots.
+        if (!Directory.Exists(evidenceDirectory) || !Directory.Exists(outboxDirectory))
+            throw new DirectoryNotFoundException(
+                "Existing evidence and outbox directories are required; recovery was not initialized.");
+
         // Never generate a replacement key when an existing queue is unreadable.
         var store = new EncryptedEvidenceStore(evidenceDirectory);
         var outbox = new PersistentOutbox(outboxDirectory, new OfflineSyncCoordinator(store));
