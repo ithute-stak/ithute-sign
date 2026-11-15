@@ -16,6 +16,8 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.6.250602001" />
+    <!-- Shared offline library only; no signing workflow is enabled by this reference. -->
+    <ProjectReference Include="..\\..\\offline-integration\\src\\OfflineIntegration.csproj" />
     <ApplicationDefinition Include="App.xaml" />
     <Page Include="MainWindow.xaml" />
   </ItemGroup>
