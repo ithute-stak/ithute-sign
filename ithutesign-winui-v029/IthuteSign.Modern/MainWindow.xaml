@@ -41,7 +41,7 @@
                             <Border x:Name="EmbeddedDeskPanel" Visibility="Collapsed" BorderThickness="1"
                                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" CornerRadius="8">
                                 <WebView2 x:Name="EmbeddedDesk" Height="690"
-                                          NavigationStarting="EmbeddedDesk_NavigationStarting" />
+                                          NavigationStarting="EmbeddedDesk_NavigationStarting" NavigationCompleted="EmbeddedDesk_NavigationCompleted" />
                             </Border>
                             <TextBlock Text="The signing desk requires an enrolled workstation and a running local hardware service. LoanHub login alone does not authorize a signature." TextWrapping="Wrap" Opacity="0.7" />
                             <TextBox x:Name="WorkstationId" Header="Approved workstation ID (UUID)" PlaceholderText="Enter the registered LoanHub workstation ID" />
