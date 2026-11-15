@@ -99,8 +99,11 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private long _loginGeneration;
+
     private async void LoanHubLogin_Click(object sender, RoutedEventArgs e)
     {
+        var generation = ++_loginGeneration;
         try
         {
             LoanHubLoginStatus.Text = "Connecting to LoanHub...";
@@ -112,6 +115,8 @@ public sealed partial class MainWindow : Window
                 var user = await session.LoginAsync(
                     LoanHubPhone.Text, LoanHubPassword.Password, LoanHubOtp.Password);
                 var companyName = await session.GetCompanyNameAsync();
+                // Logout or a newer login invalidates this in-flight response.
+                if (generation != _loginGeneration) return;
                 _loanHubSession = session;
                 await RefreshCompanyLoansAsync();
                 LoanHubLoginStatus.Text =
@@ -126,6 +131,7 @@ public sealed partial class MainWindow : Window
         }
         catch (Exception ex)
         {
+            if (generation != _loginGeneration) return;
             LoanHubLoginStatus.Text = "Not connected.";
             ShowError("LoanHub login failed: " + ex.Message);
         }
@@ -457,6 +463,7 @@ public sealed partial class MainWindow : Window
 
     private void LoanHubLogout_Click(object sender, RoutedEventArgs e)
     {
+        ++_loginGeneration;
         _loanHubSession?.Dispose();
         _loanHubSession = null;
         _companyLoans = Array.Empty<CompanyLoanRow>();
