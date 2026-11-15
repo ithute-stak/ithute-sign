@@ -1,0 +1,73 @@
+@using IthuteSign.Modern
+@using Microsoft.AspNetCore.Components
+@inject LoanHubWorkspace Workspace
+<div class="shell">
+  <aside class="sidebar">
+    <div class="brand"><div class="brandmark">I</div><div><strong>IthuteSign</strong><small>LOAN OPERATIONS</small></div></div>
+    <div class="nav-label">WORKSPACE</div>
+    <div class="nav-item active">▦ &nbsp; Company Loans</div>
+    <div class="sidebar-bottom"><span class="status-dot"></span> LoanHub secure connection</div>
+  </aside>
+  <main class="main">
+    <header class="topbar"><div><span class="eyebrow">ITHUTE DIGITAL SOLUTIONS</span><h1>Company Loans</h1><p>Review and manage your company's loan portfolio</p></div><div class="user-chip">@(Workspace.CompanyName ?? "Employee sign in")</div></header>
+    @if (!Workspace.LoggedIn)
+    {
+      <section class="login-wrap"><div class="panel login-panel"><div class="panel-icon">↗</div><h2>Welcome back</h2><p>Sign in with your LoanHub employee credentials to load your company's loans.</p>
+        <form @onsubmit="Login" @onsubmit:preventDefault>
+          <label>Phone number<input autocomplete="username" @bind="phone" required /></label>
+          <label>Password<input type="password" autocomplete="current-password" @bind="password" required /></label>
+          <label>OTP <span class="optional">(if required)</span><input @bind="otp" /></label>
+          <button type="submit" disabled="@busy">@(busy ? "Signing in..." : "Sign in to LoanHub")</button>
+        </form>
+        @if (error is not null) { <p class="error" role="alert">@error</p> }
+      </div></section>
+    }
+    else
+    {
+      <div class="toolbar"><div class="searchbox"><span>⌕</span><input placeholder="Search loan number, folio or status" @bind="search" @bind:event="oninput" /></div><button class="secondary" @onclick="LoadLoans" disabled="@busy">↻ Refresh</button><button class="secondary" @onclick="Logout">Log out</button></div>
+      <div class="stats"><div class="stat"><span>Total loaded</span><strong>@loans.Count</strong></div><div class="stat"><span>Displayed</span><strong>@Filtered.Count()</strong></div><div class="stat"><span>Company</span><strong class="company-name">@Workspace.CompanyName</strong></div></div>
+      <section class="panel table-panel"><div class="table-heading"><div><h2>Loan portfolio</h2><p>Read-only information from LoanHub</p></div><span class="pill">Live API</span></div>
+        @if (busy) { <div class="empty">Loading loans…</div> }
+        else if (error is not null) { <div class="empty error" role="alert">@error</div> }
+        else if (!Filtered.Any()) { <div class="empty">No matching loans found.</div> }
+        else
+        {
+          <div class="table-scroll"><table><thead><tr><th>Folio</th><th>Loan reference</th><th>Principal</th><th>Total repayable</th><th>Balance</th><th>Status</th></tr></thead><tbody>
+            @foreach (var loan in Filtered)
+            {
+              <tr @onclick="() => selected = loan" class="@(selected?.Id == loan.Id ? "selected" : "")"><td><strong>@(loan.FolioNumber ?? "—")</strong>@if (loan.IsTopUp) { <small class="tag">TOP-UP</small> }</td><td>@loan.LoanReference</td><td>LSL @loan.Principal.ToString("N2")</td><td>LSL @loan.TotalRepayable.ToString("N2")</td><td>LSL @loan.Balance.ToString("N2")</td><td><span class="pill muted">@loan.Status</span></td></tr>
+            }
+          </tbody></table></div>
+        }
+      </section>
+      @if (selected is not null) { <section class="panel details"><h2>Loan details</h2><p><strong>@selected.FolioNumber</strong> · @selected.LoanReference</p><div>Principal: LSL @selected.Principal.ToString("N2") &nbsp; | &nbsp; Balance: LSL @selected.Balance.ToString("N2") &nbsp; | &nbsp; Status: @selected.Status</div></section> }
+    }
+  </main>
+</div>
+@code {
+  private string phone = "", password = "", otp = "", search = "";
+  private string? error;
+  private bool busy;
+  private List<CompanyLoanRow> loans = new();
+  private CompanyLoanRow? selected;
+  private IEnumerable<CompanyLoanRow> Filtered => loans.Where(x => string.IsNullOrWhiteSpace(search) ||
+    (x.FolioNumber?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false) ||
+    (x.LoanReference?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false) ||
+    (x.Status?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false));
+  private async Task Login()
+  {
+    busy = true; error = null;
+    try { await Workspace.LoginAsync(phone, password, otp); password = ""; otp = ""; await FetchLoans(); }
+    catch (Exception ex) { error = ex.Message; password = ""; }
+    finally { busy = false; }
+  }
+  private async Task LoadLoans()
+  {
+    busy = true; error = null;
+    try { await FetchLoans(); }
+    catch (Exception ex) { error = ex.Message; }
+    finally { busy = false; }
+  }
+  private async Task FetchLoans() { loans = (await Workspace.LoansAsync()).ToList(); selected = null; }
+  private void Logout() { Workspace.Logout(); loans.Clear(); selected = null; password = ""; otp = ""; error = null; }
+}

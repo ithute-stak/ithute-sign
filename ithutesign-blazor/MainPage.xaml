@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:IthuteSign.Blazor"
+             xmlns:blazor="clr-namespace:Microsoft.AspNetCore.Components.WebView.Maui;assembly=Microsoft.AspNetCore.Components.WebView.Maui"
+             x:Class="IthuteSign.Blazor.MainPage"
+             BackgroundColor="#F4F6FA">
+  <Grid RowDefinitions="Auto,*">
+    <Label Grid.Row="0" x:Name="StartupStatus"
+           Text="IthuteSign • Starting Blazor interface…"
+           BackgroundColor="#10223E" TextColor="White"
+           Padding="16,10" FontSize="13" />
+    <blazor:BlazorWebView Grid.Row="1" x:Name="WorkspaceWebView"
+                         HostPage="wwwroot/index.html">
+      <blazor:BlazorWebView.RootComponents>
+        <blazor:RootComponent Selector="#app" ComponentType="{x:Type local:AppRoot}" />
+      </blazor:BlazorWebView.RootComponents>
+    </blazor:BlazorWebView>
+  </Grid>
+</ContentPage>
