@@ -122,6 +122,12 @@ public sealed partial class MainWindow : Window
                 if (generation != _loginGeneration) return;
                 _loanHubSession = session;
                 await RefreshCompanyLoansAsync();
+                // Refresh is asynchronous: logout or a newer login can happen
+                // before it returns. Never restore an old operator's status.
+                if (generation != _loginGeneration ||
+                    !ReferenceEquals(_loanHubSession, session) ||
+                    !session.IsAuthenticated)
+                    return;
                 LoanHubLoginStatus.Text =
                     $"Authenticated: {user.Phone} | Company: {companyName}. Signing requires separate workstation and document authorization.";
             }
