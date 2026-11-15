@@ -41,8 +41,7 @@ public sealed class LoanHubContractWorkflowStatusClient
         var status = await response.Content.ReadFromJsonAsync<LoanHubContractWorkflowStatus>(
             cancellationToken: cancellationToken);
         if (status is null || status.ContractId != contractId ||
-            (status.CandidateArchived && !IsSha256(status.CandidateSha256)) ||
-            (status.ContractSigned && !status.LegalExecutionVerified))
+            (status.CandidateArchived && !IsSha256(status.CandidateSha256)))
             throw new InvalidOperationException("LoanHub returned an inconsistent signing status.");
         return status;
     }
