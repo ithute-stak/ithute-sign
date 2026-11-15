@@ -31,7 +31,7 @@
                                 <Button Content="Log out" Click="LoanHubLogout_Click" />
                             </StackPanel>
                             <TextBlock x:Name="LoanHubLoginStatus" Text="Not connected. LoanHub signing is unavailable until authorized." TextWrapping="Wrap" />
-                            <Expander Header="Workstation setup and diagnostics" IsExpanded="False">
+                            <Expander x:Name="WorkstationDeskExpander" Header="Workstation setup and diagnostics" IsExpanded="False">
                                 <StackPanel Spacing="10" Padding="8">
                             <Button Content="Check local Wacom connector" Click="CheckLocalConnector_Click" />
                             <TextBlock x:Name="LocalConnectorStatus" Text="Local connector has not been checked. Signing disabled." TextWrapping="Wrap" />
