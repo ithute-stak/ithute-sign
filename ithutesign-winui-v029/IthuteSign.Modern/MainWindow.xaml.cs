@@ -134,17 +134,29 @@ public sealed partial class MainWindow : Window
     private async Task RefreshCompanyLoansAsync()
     {
         if (_loanHubSession is null || !_loanHubSession.IsAuthenticated || _loansLoading) return;
+        var session = _loanHubSession;
+        var companyId = session.CompanyId;
         _loansLoading = true;
         CompanyLoansStatus.Text = "Loading company loans...";
         try
         {
-            _companyLoans = await _loanHubSession.GetCompanyLoansAsync();
+            var loans = await session.GetCompanyLoansAsync();
+            // A logout or company/session change during the API request must
+            // never repopulate the UI with the previous operator's loan data.
+            if (!ReferenceEquals(session, _loanHubSession) ||
+                !session.IsAuthenticated || session.CompanyId != companyId)
+                return;
+            _companyLoans = loans;
+            CompanyLoanDetails.Text = "";
+            CompanyLoansList.SelectedItem = null;
             FilterCompanyLoans();
         }
         catch (Exception ex)
         {
+            if (!ReferenceEquals(session, _loanHubSession)) return;
             _companyLoans = Array.Empty<CompanyLoanRow>();
             CompanyLoansList.ItemsSource = null;
+            CompanyLoanDetails.Text = "";
             CompanyLoansStatus.Text = "Unable to load company loans: " + ex.Message;
         }
         finally { _loansLoading = false; }
