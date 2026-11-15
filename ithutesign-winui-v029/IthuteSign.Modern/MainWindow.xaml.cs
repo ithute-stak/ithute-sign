@@ -459,6 +459,9 @@ public sealed partial class MainWindow : Window
                 EmbeddedDesk.CoreWebView2.Settings.IsWebMessageEnabled = false;
                 _embeddedDeskReady = true;
             }
+            // The embedded desk lives inside a collapsed diagnostics expander.
+            // Reveal it when the operator opens a selected loan.
+            WorkstationDeskExpander.IsExpanded = true;
             EmbeddedDeskPanel.Visibility = Visibility.Visible;
             EmbeddedDesk.Source = new Uri("http://127.0.0.1:8767/");
             EmbeddedDeskStatus.Text =
