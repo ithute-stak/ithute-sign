@@ -21,7 +21,7 @@
                 <StackPanel Padding="40,30,40,40" Spacing="20" MaxWidth="1050" HorizontalAlignment="Left">
                     <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="14" Padding="20">
                         <StackPanel Spacing="10">
-                            <TextBlock Text="LoanHub employee and workstation access" FontSize="20" FontWeight="SemiBold" />
+                            <TextBlock Text="1. Log in to LoanHub" FontSize="20" FontWeight="SemiBold" />
                             <TextBlock Text="LoanHub server: https://api.loanhub.co.ls (fixed)" Opacity="0.7" />
                             <TextBox x:Name="LoanHubPhone" Header="Phone number" />
                             <PasswordBox x:Name="LoanHubPassword" Header="Password" />
@@ -30,6 +30,9 @@
                                 <Button Content="Log in to LoanHub" Click="LoanHubLogin_Click" />
                                 <Button Content="Log out" Click="LoanHubLogout_Click" />
                             </StackPanel>
+                            <TextBlock x:Name="LoanHubLoginStatus" Text="Not connected. LoanHub signing is unavailable until authorized." TextWrapping="Wrap" />
+                            <Expander Header="Workstation setup and diagnostics" IsExpanded="False">
+                                <StackPanel Spacing="10" Padding="8">
                             <Button Content="Check local Wacom connector" Click="CheckLocalConnector_Click" />
                             <TextBlock x:Name="LocalConnectorStatus" Text="Local connector has not been checked. Signing disabled." TextWrapping="Wrap" />
                             <Button Content="Open secure local Wacom workstation desk" Click="OpenLocalWorkstationDesk_Click" />
@@ -46,24 +49,25 @@
                             <TextBlock Text="Device proof is performed inside the enrolled local connector. A challenge expires after 30 seconds and must be signed and submitted immediately by the connector." TextWrapping="Wrap" Opacity="0.7" />
                             <TextBlock x:Name="DeviceChallengeStatus" Text="Device proof has not been requested. Signing disabled." TextWrapping="Wrap" />
                             <TextBlock x:Name="WorkstationStatus" Text="Workstation not verified. Signing disabled." TextWrapping="Wrap" />
-                            <TextBlock x:Name="LoanHubLoginStatus" Text="Not connected. LoanHub signing is unavailable until authorized." TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Expander>
                         </StackPanel>
                     </Border>
                     <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="14" Padding="20">
                         <StackPanel Spacing="12">
-                            <TextBlock Text="Company Loans" FontSize="24" FontWeight="SemiBold" />
+                            <TextBlock Text="2. Select a company loan" FontSize="24" FontWeight="SemiBold" />
                             <TextBlock Text="Loans are loaded automatically after LoanHub employee login. Viewing does not require a Wacom connector." TextWrapping="Wrap" />
                             <TextBox x:Name="CompanyLoansSearch" Header="Search loans" PlaceholderText="Folio, reference or status" TextChanged="CompanyLoansSearch_TextChanged" />
                             <Button Content="Refresh loans" Click="RefreshCompanyLoans_Click" HorizontalAlignment="Left" />
                             <TextBlock x:Name="CompanyLoansStatus" Text="Log in to load company loans." TextWrapping="Wrap" />
                             <ListView x:Name="CompanyLoansList" Height="420" SelectionMode="Single" SelectionChanged="CompanyLoansList_SelectionChanged" />
                             <TextBlock x:Name="CompanyLoanDetails" TextWrapping="Wrap" />
-                            <Button x:Name="OpenSelectedLoanDesk" Content="Open selected loan in secure Wacom desk" IsEnabled="False" Click="OpenSelectedLoanDesk_Click" HorizontalAlignment="Left" />
+                            <Button x:Name="OpenSelectedLoanDesk" Content="3. Open loan contract workspace" IsEnabled="False" Click="OpenSelectedLoanDesk_Click" HorizontalAlignment="Left" />
                             <TextBlock x:Name="SelectedLoanDeskStatus" Text="Select a company loan first. The secure desk requires separate workstation authorization." TextWrapping="Wrap" />
                         </StackPanel>
                     </Border>
                     <StackPanel Spacing="6">
-                        <TextBlock Text="Welcome to IthuteSign" FontSize="32" FontWeight="SemiBold" />
+                        <TextBlock Text="Contract signing tools" FontSize="32" FontWeight="SemiBold" />
                         <TextBlock Text="Authenticated LoanHub contract review and Wacom evidence capture" Opacity="0.72" FontSize="15" />
                     </StackPanel>
                     <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="14" Padding="20">
