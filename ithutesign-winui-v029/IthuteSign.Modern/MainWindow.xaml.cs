@@ -110,6 +110,22 @@ public sealed partial class MainWindow : Window
         try
         {
             LoanHubLoginStatus.Text = "Connecting to LoanHub...";
+            // Starting a different login invalidates all prior operator context,
+            // even when the previous operator did not press Logout.
+            _pendingDeskBorrowerId = null;
+            _pendingDeskLoanId = null;
+            _deskBorrowerHandoffSubmitted = false;
+            _companyLoans = Array.Empty<CompanyLoanRow>();
+            CompanyLoansList.ItemsSource = null;
+            OpenSelectedLoanDesk.IsEnabled = false;
+            CompanyLoanDetails.Text = "";
+            SelectedLoanContractContext.Text = "Select a loan to see its borrower and contract context.";
+            CompanyLoansStatus.Text = "Log in to load company loans.";
+            EmbeddedDeskPanel.Visibility = Visibility.Collapsed;
+            if (_embeddedDeskReady)
+                EmbeddedDesk.Source = new Uri("about:blank");
+            EmbeddedDeskStatus.Text = "Sign in to the workstation desk for the current operator.";
+            SelectedLoanDeskStatus.Text = "Log in and select an authorized company loan.";
             _loanHubSession?.Dispose();
             _loanHubSession = null;
             var session = new LoanHubSession(new Uri("https://api.loanhub.co.ls/", UriKind.Absolute));
