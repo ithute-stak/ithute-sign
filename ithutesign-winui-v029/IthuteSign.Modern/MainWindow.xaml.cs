@@ -17,6 +17,7 @@ public sealed partial class MainWindow : Window
     private IReadOnlyList<CompanyLoanRow> _companyLoans = Array.Empty<CompanyLoanRow>();
     private bool _loansLoading;
     private Guid? _pendingDeskBorrowerId;
+    private Guid? _pendingDeskLoanId;
     private bool _deskBorrowerHandoffSubmitted;
 
     private void CheckOfflineRecoveryReadiness_Click(object sender, RoutedEventArgs e)
@@ -230,6 +231,8 @@ public sealed partial class MainWindow : Window
             SelectedLoanDeskStatus.Text = "Selected loan has no valid borrower ID.";
             return;
         }
+        if (!Guid.TryParse(loan.Id.ToString(), out var selectedLoanId)) return;
+        _pendingDeskLoanId = selectedLoanId;
         _pendingDeskBorrowerId = borrowerId;
         _deskBorrowerHandoffSubmitted = false;
         SelectedLoanDeskStatus.Text = "Opening Wacom desk. Sign in there if requested; selected borrower will load automatically.";
@@ -449,14 +452,15 @@ public sealed partial class MainWindow : Window
 
     private async void EmbeddedDesk_NavigationCompleted(WebView2 sender, CoreWebView2NavigationCompletedEventArgs args)
     {
-        if (!args.IsSuccess || _deskBorrowerHandoffSubmitted || _pendingDeskBorrowerId is not Guid borrowerId)
+        if (!args.IsSuccess || _deskBorrowerHandoffSubmitted || _pendingDeskBorrowerId is not Guid borrowerId || _pendingDeskLoanId is not Guid loanId)
             return;
         var loan = CompanyLoansList.SelectedItem as CompanyLoanRow;
         if (_loanHubSession?.IsAuthenticated != true || loan is null ||
             loan.CompanyId != _loanHubSession.CompanyId ||
             !_companyLoans.Any(row => ReferenceEquals(row, loan)) ||
             !Guid.TryParse(loan.BorrowerId.ToString(), out var selectedId) ||
-            selectedId != borrowerId)
+            selectedId != borrowerId ||
+            !Guid.TryParse(loan.Id.ToString(), out var currentLoanId) || currentLoanId != loanId)
         {
             _pendingDeskBorrowerId = null;
             return;
@@ -469,6 +473,7 @@ public sealed partial class MainWindow : Window
         var script = "(function(){const f=document.querySelector('form[action=\\\"/lookup-borrower\\\"]');" +
             "if(!f)return false;const i=f.querySelector('input[name=\\\"borrower_id\\\"]');" +
             "if(!i)return false;i.value=" + JsonSerializer.Serialize(borrowerId.ToString()) +
+            ";const l=f.querySelector(\'input[name=\\\"loan_id\\\"]\');if(!l)return false;l.value=" + JsonSerializer.Serialize(loanId.ToString()) +
             ";f.requestSubmit();return true;})()";
         try
         {
