@@ -17,6 +17,18 @@ public sealed partial class MainWindow : Window
     private IReadOnlyList<CompanyLoanRow> _companyLoans = Array.Empty<CompanyLoanRow>();
     private bool _loansLoading;
 
+    private void CheckOfflineRecoveryReadiness_Click(object sender, RoutedEventArgs e)
+    {
+        // No key is generated, read, displayed or persisted by this diagnostic.
+        // A verified workstation key-provider and authorization gate must be
+        // integrated before the encrypted outbox can be safely inspected.
+        OfflineRecoveryStatusText.Text =
+            "Recovery is unavailable: protected workstation key provisioning and " +
+            "operator authorization are not configured. No evidence was read, " +
+            "uploaded or deleted. No LoanHub contract status was changed.";
+    }
+
+
     private async void TestWacom_Click(object sender, RoutedEventArgs e)
     {
         // Hardware diagnostics only. No LoanHub contract authorization or signed-status changes.
