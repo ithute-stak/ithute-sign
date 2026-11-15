@@ -112,6 +112,20 @@ await Reject(async () => await new LoanHubDocumentConsentClient(forgedConsentHtt
     .RecordConsentAsync(prepared, company, "Reviewed exact PDF", "CONSENT-TEST-003",
         sha, "test-token", "wb1_test"), "consent cannot silently grant signing");
 
+// A synthetic cross-origin redirect must not be accepted even with a valid PDF hash.
+using var redirectedPdfHttp = new HttpClient(new FakeHandler(_ => {
+    var response = new HttpResponseMessage(HttpStatusCode.OK) {
+        Content = new ByteArrayContent(pdf),
+        RequestMessage = new HttpRequestMessage(HttpMethod.Get, "https://other.example/contract.pdf")
+    };
+    response.Content.Headers.ContentType = new("application/pdf");
+    response.Headers.Add("X-Wacom-Original-SHA256", sha);
+    return response;
+})) { BaseAddress = new Uri("https://loanhub.example/") };
+await Reject(async () => await new LoanHubOriginalContractReader(redirectedPdfHttp)
+    .ReadOriginalPdfAsync(prepared, company, "test-token", "wb1_test"),
+    "redirected original PDF rejected");
+
 Console.WriteLine("PASS: exact contract discovery, preparation, original PDF verification, consent and negative checks.");
 
 static HttpResponseMessage Json(object data, HttpStatusCode status = HttpStatusCode.OK) =>
@@ -126,6 +140,11 @@ static async Task Reject(Func<Task> action, string name) {
     throw new Exception("FAILED: " + name);
 }
 sealed class FakeHandler(Func<HttpRequestMessage, HttpResponseMessage> responder) : HttpMessageHandler {
-    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token) =>
-        Task.FromResult(responder(request));
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token) {
+        var response = responder(request);
+        // HttpClientHandler populates this automatically; the synthetic handler
+        // must do the same for final-origin validation to be meaningful.
+        response.RequestMessage ??= request;
+        return Task.FromResult(response);
+    }
 }
