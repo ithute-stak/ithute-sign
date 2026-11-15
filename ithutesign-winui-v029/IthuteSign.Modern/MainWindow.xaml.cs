@@ -181,11 +181,38 @@ public sealed partial class MainWindow : Window
 
     private void CompanyLoansList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (CompanyLoansList.SelectedItem is CompanyLoanRow loan)
-            CompanyLoanDetails.Text = $"Loan: {loan.FolioNumber} | Reference: {loan.LoanReference} | " +
-                $"Status: {loan.Status} | Principal: LSL {loan.Principal:N2} | " +
-                $"Total: LSL {loan.TotalRepayable:N2} | Balance: LSL {loan.Balance:N2}" +
-                (loan.MaturityDate is null ? "" : $" | Maturity: {loan.MaturityDate:dd MMM yyyy}");
+        var loan = CompanyLoansList.SelectedItem as CompanyLoanRow;
+        bool authorized = loan is not null && _loanHubSession?.IsAuthenticated == true &&
+            _loanHubSession.CompanyId == loan.CompanyId &&
+            loan.Id != Guid.Empty && loan.BorrowerId != Guid.Empty &&
+            _companyLoans.Any(row => ReferenceEquals(row, loan));
+        OpenSelectedLoanDesk.IsEnabled = authorized;
+        SelectedLoanDeskStatus.Text = authorized
+            ? "Loan selected. The secure Wacom desk requires its own verified workstation session."
+            : "Select an authorized company loan first.";
+        CompanyLoanDetails.Text = authorized
+            ? $"Loan: {loan!.FolioNumber} | Reference: {loan.LoanReference} | " +
+              $"Status: {loan.Status} | Principal: LSL {loan.Principal:N2} | " +
+              $"Total: LSL {loan.TotalRepayable:N2} | Balance: LSL {loan.Balance:N2}" +
+              (loan.MaturityDate is null ? "" : $" | Maturity: {loan.MaturityDate:dd MMM yyyy}")
+            : "";
+    }
+
+    private void OpenSelectedLoanDesk_Click(object sender, RoutedEventArgs e)
+    {
+        var loan = CompanyLoansList.SelectedItem as CompanyLoanRow;
+        if (loan is null || _loanHubSession?.IsAuthenticated != true ||
+            _loanHubSession.CompanyId != loan.CompanyId ||
+            !_companyLoans.Any(row => ReferenceEquals(row, loan)))
+        {
+            OpenSelectedLoanDesk.IsEnabled = false;
+            SelectedLoanDeskStatus.Text = "LoanHub session or loan selection is no longer valid.";
+            return;
+        }
+        // The connector authenticates independently. Never send loan IDs,
+        // credentials, or bridge session tokens through a localhost URL.
+        SelectedLoanDeskStatus.Text = "Opening secure Wacom desk. Select the borrower again inside the desk.";
+        OpenEmbeddedWorkstationDesk_Click(sender, e);
     }
 
     private async void ContractPreflight_Click(object sender, RoutedEventArgs e)
@@ -434,6 +461,7 @@ public sealed partial class MainWindow : Window
         _loanHubSession = null;
         _companyLoans = Array.Empty<CompanyLoanRow>();
         CompanyLoansList.ItemsSource = null;
+        OpenSelectedLoanDesk.IsEnabled = false;
         CompanyLoanDetails.Text = "";
         CompanyLoansStatus.Text = "Log in to load company loans.";
         LoanHubPassword.Password = "";

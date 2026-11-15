@@ -58,6 +58,8 @@
                             <TextBlock x:Name="CompanyLoansStatus" Text="Log in to load company loans." TextWrapping="Wrap" />
                             <ListView x:Name="CompanyLoansList" Height="420" SelectionMode="Single" SelectionChanged="CompanyLoansList_SelectionChanged" />
                             <TextBlock x:Name="CompanyLoanDetails" TextWrapping="Wrap" />
+                            <Button x:Name="OpenSelectedLoanDesk" Content="Open selected loan in secure Wacom desk" IsEnabled="False" Click="OpenSelectedLoanDesk_Click" HorizontalAlignment="Left" />
+                            <TextBlock x:Name="SelectedLoanDeskStatus" Text="Select a company loan first. The secure desk requires separate workstation authorization." TextWrapping="Wrap" />
                         </StackPanel>
                     </Border>
                     <StackPanel Spacing="6">
