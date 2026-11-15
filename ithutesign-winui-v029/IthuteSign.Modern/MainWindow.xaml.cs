@@ -154,6 +154,7 @@ public sealed partial class MainWindow : Window
                 return;
             _companyLoans = loans;
             CompanyLoanDetails.Text = "";
+            SelectedLoanContractContext.Text = "Select a loan to see its borrower and contract context.";
             CompanyLoansList.SelectedItem = null;
             FilterCompanyLoans();
         }
@@ -163,6 +164,7 @@ public sealed partial class MainWindow : Window
             _companyLoans = Array.Empty<CompanyLoanRow>();
             CompanyLoansList.ItemsSource = null;
             CompanyLoanDetails.Text = "";
+            SelectedLoanContractContext.Text = "Select a loan to see its borrower and contract context.";
             CompanyLoansStatus.Text = "Unable to load company loans: " + ex.Message;
         }
         finally { _loansLoading = false; }
@@ -196,6 +198,10 @@ public sealed partial class MainWindow : Window
         SelectedLoanDeskStatus.Text = authorized
             ? "Loan selected. The secure Wacom desk requires its own verified workstation session."
             : "Select an authorized company loan first.";
+        SelectedLoanContractContext.Text = authorized
+            ? $"Selected borrower: {loan!.BorrowerId:D} | Loan: {loan.Id:D}. " +
+              "This is the exact LoanHub loan context; its contract PDF is not loaded yet."
+            : "Select a loan to see its borrower and contract context.";
         CompanyLoanDetails.Text = authorized
             ? $"Loan: {loan!.FolioNumber} | Reference: {loan.LoanReference} | " +
               $"Status: {loan.Status} | Principal: LSL {loan.Principal:N2} | " +
@@ -470,6 +476,7 @@ public sealed partial class MainWindow : Window
         CompanyLoansList.ItemsSource = null;
         OpenSelectedLoanDesk.IsEnabled = false;
         CompanyLoanDetails.Text = "";
+        SelectedLoanContractContext.Text = "Select a loan to see its borrower and contract context.";
         CompanyLoansStatus.Text = "Log in to load company loans.";
         LoanHubPassword.Password = "";
         LoanHubOtp.Password = "";
