@@ -118,6 +118,8 @@ public sealed partial class MainWindow : Window
             _companyLoans = Array.Empty<CompanyLoanRow>();
             CompanyLoansList.ItemsSource = null;
             OpenSelectedLoanDesk.IsEnabled = false;
+            RefreshSelectedContractStatus.IsEnabled = false;
+            SelectedContractWorkflowStatus.Text = "Contract status not checked.";
             CompanyLoanDetails.Text = "";
             SelectedLoanContractContext.Text = "Select a loan to see its borrower and contract context.";
             CompanyLoansStatus.Text = "Log in to load company loans.";
@@ -190,6 +192,8 @@ public sealed partial class MainWindow : Window
             if (!ReferenceEquals(session, _loanHubSession)) return;
             _companyLoans = Array.Empty<CompanyLoanRow>();
             CompanyLoansList.ItemsSource = null;
+            RefreshSelectedContractStatus.IsEnabled = false;
+            SelectedContractWorkflowStatus.Text = "Contract status not checked.";
             CompanyLoanDetails.Text = "";
             SelectedLoanContractContext.Text = "Select a loan to see its borrower and contract context.";
             CompanyLoansStatus.Text = "Unable to load company loans: " + ex.Message;
@@ -594,6 +598,8 @@ public sealed partial class MainWindow : Window
         SelectedLoanDeskStatus.Text = "Log in and select an authorized company loan.";
         CompanyLoansList.ItemsSource = null;
         OpenSelectedLoanDesk.IsEnabled = false;
+        RefreshSelectedContractStatus.IsEnabled = false;
+        SelectedContractWorkflowStatus.Text = "Contract status not checked.";
         CompanyLoanDetails.Text = "";
         SelectedLoanContractContext.Text = "Select a loan to see its borrower and contract context.";
         CompanyLoansStatus.Text = "Log in to load company loans.";
