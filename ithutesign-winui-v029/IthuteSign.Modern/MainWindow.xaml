@@ -63,6 +63,8 @@
                             <ListView x:Name="CompanyLoansList" Height="420" SelectionMode="Single" SelectionChanged="CompanyLoansList_SelectionChanged" />
                             <TextBlock x:Name="CompanyLoanDetails" TextWrapping="Wrap" />
                             <TextBlock x:Name="SelectedLoanContractContext" Text="Select a loan to see its borrower and contract context." TextWrapping="Wrap" />
+                            <Button x:Name="LoadSigningAttempts" Content="Load signing attempts for selected contract" Click="LoadSigningAttempts_Click" HorizontalAlignment="Left" />
+                            <ComboBox x:Name="SigningAttemptPicker" Header="Exact signing attempt" PlaceholderText="Load attempts to choose a receipt" Width="460" SelectionChanged="SigningAttemptPicker_SelectionChanged" />
                             <TextBlock x:Name="SelectedContractWorkflowStatus" Text="Contract status not checked." TextWrapping="Wrap" />
                             <Button x:Name="RefreshSelectedContractStatus" Content="Check contract signing status" IsEnabled="False" Click="RefreshSelectedContractStatus_Click" HorizontalAlignment="Left" />
                             <Button x:Name="OpenSelectedLoanDesk" Content="3. Open loan contract workspace" IsEnabled="False" Click="OpenSelectedLoanDesk_Click" HorizontalAlignment="Left" />
