@@ -250,6 +250,70 @@ public sealed partial class MainWindow : Window
             : "";
     }
 
+    private Guid? _attemptsForContractId;
+    private LoanHubSession? _attemptsSession;
+    private CompanyLoanRow? _attemptsLoan;
+
+    private void SigningAttemptPicker_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        SelectedContractWorkflowStatus.Text = "Signing attempt changed. Check status again.";
+    }
+
+    private async void LoadSigningAttempts_Click(object sender, RoutedEventArgs e)
+    {
+        var session = _loanHubSession;
+        var loan = CompanyLoansList.SelectedItem as CompanyLoanRow;
+        SigningAttemptPicker.ItemsSource = null;
+        _attemptsForContractId = null;
+        _attemptsSession = null;
+        _attemptsLoan = null;
+        if (session?.IsAuthenticated != true || loan is null ||
+            session.CompanyId != loan.CompanyId || !_companyLoans.Any(r => ReferenceEquals(r, loan)) ||
+            !_embeddedDeskReady || EmbeddedDesk.Source is not Uri uri ||
+            uri.Scheme != Uri.UriSchemeHttp || uri.Host != "127.0.0.1" || uri.Port != 8767)
+        {
+            SelectedContractWorkflowStatus.Text = "Open the selected loan in the local Wacom desk first.";
+            return;
+        }
+        LoadSigningAttempts.IsEnabled = false;
+        try
+        {
+            var json = await EmbeddedDesk.ExecuteScriptAsync(
+                "(function(){const p=document.querySelector('select#contract_id');return p ? p.value : null;})()");
+            if (!Guid.TryParse(JsonSerializer.Deserialize<string?>(json), out var contractId) ||
+                contractId == Guid.Empty)
+                throw new InvalidOperationException("Select an exact contract in the Wacom desk.");
+            var result = await session.GetContractSigningAttemptsAsync(contractId);
+            if (!ReferenceEquals(session, _loanHubSession) || !session.IsAuthenticated ||
+                !ReferenceEquals(loan, CompanyLoansList.SelectedItem))
+                return;
+            var currentJson = await EmbeddedDesk.ExecuteScriptAsync(
+                "(function(){const p=document.querySelector('select#contract_id');return p ? p.value : null;})()");
+            if (!Guid.TryParse(JsonSerializer.Deserialize<string?>(currentJson), out var currentId) ||
+                currentId != contractId)
+                throw new InvalidOperationException("Contract changed while loading attempts. Reload.");
+            _attemptsForContractId = contractId;
+            _attemptsSession = session;
+            _attemptsLoan = loan;
+            SigningAttemptPicker.ItemsSource = result.Attempts;
+            SigningAttemptPicker.DisplayMemberPath = "ReceiptId";
+            SelectedContractWorkflowStatus.Text = result.Attempts!.Count == 0
+                ? "No Wacom signing attempts recorded for this contract."
+                : $"Loaded {result.Attempts.Count} attempt(s). Select a receipt and check status." +
+                  (result.Truncated ? " More attempts exist; list is limited to 100." : "");
+        }
+        catch (Exception ex)
+        {
+            if (ReferenceEquals(session, _loanHubSession) &&
+                ReferenceEquals(loan, CompanyLoansList.SelectedItem))
+                SelectedContractWorkflowStatus.Text = "Signing attempts unavailable: " + ex.Message;
+        }
+        finally
+        {
+            LoadSigningAttempts.IsEnabled = true;
+        }
+    }
+
     private async void RefreshSelectedContractStatus_Click(object sender, RoutedEventArgs e)
     {
         var session = _loanHubSession;
@@ -280,7 +344,15 @@ public sealed partial class MainWindow : Window
             var contractText = JsonSerializer.Deserialize<string?>(json);
             if (!Guid.TryParse(contractText, out var contractId) || contractId == Guid.Empty)
                 throw new InvalidOperationException("No exact contract is selected in the workstation desk.");
-            var status = await session.GetContractWorkflowStatusAsync(contractId);
+            var selectedAttempt = SigningAttemptPicker.SelectedItem as LoanHubSigningAttempt;
+            if (selectedAttempt is not null &&
+                (_attemptsForContractId != contractId ||
+                 !ReferenceEquals(_attemptsSession, session) ||
+                 !ReferenceEquals(_attemptsLoan, loan)))
+                throw new InvalidOperationException("Signing attempt selection is stale. Reload attempts.");
+            var status = selectedAttempt is null
+                ? await session.GetContractWorkflowStatusAsync(contractId)
+                : await session.GetContractAttemptWorkflowStatusAsync(contractId, selectedAttempt.ReceiptId);
             // Contract selection can change during the network request. Never
             // show a different contract's status under the current selection.
             if (!ReferenceEquals(session, _loanHubSession) || !session.IsAuthenticated ||
@@ -293,6 +365,12 @@ public sealed partial class MainWindow : Window
                 currentContractId != contractId)
             {
                 SelectedContractWorkflowStatus.Text = "Contract selection changed. Check status again.";
+                return;
+            }
+            if (selectedAttempt is not null &&
+                !ReferenceEquals(selectedAttempt, SigningAttemptPicker.SelectedItem))
+            {
+                SelectedContractWorkflowStatus.Text = "Signing attempt changed. Check status again.";
                 return;
             }
             SelectedContractWorkflowStatus.Text = status.ContractSigned
