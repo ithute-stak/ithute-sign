@@ -54,6 +54,7 @@ public sealed class LoanHubContractWorkflowStatusClient
 public sealed class LoanHubContractWorkflowStatus
 {
     [JsonPropertyName("contract_id")] public Guid ContractId { get; set; }
+    [JsonPropertyName("receipt_id")] public Guid? ReceiptId { get; set; }
     [JsonPropertyName("candidate_archived")] public bool CandidateArchived { get; set; }
     [JsonPropertyName("candidate_sha256")] public string? CandidateSha256 { get; set; }
     [JsonPropertyName("ceremony_status")] public string? CeremonyStatus { get; set; }

@@ -212,6 +212,35 @@ public sealed class LoanHubSession : IDisposable
         return status;
     }
 
+    /// <summary>Read-only status for an exact contract and Wacom signing receipt.</summary>
+    public async Task<LoanHubContractWorkflowStatus> GetContractAttemptWorkflowStatusAsync(
+        Guid contractId, Guid receiptId, CancellationToken cancellationToken = default)
+    {
+        if (!IsAuthenticated || CompanyId is null ||
+            contractId == Guid.Empty || receiptId == Guid.Empty)
+            throw new UnauthorizedAccessException("Staff session, contract and receipt required.");
+        var companyId = CompanyId.Value;
+        var token = _token;
+        using var request = new HttpRequestMessage(HttpMethod.Get,
+            $"api/v1/wacom-pdf-candidate-verification/contracts/{contractId:D}/receipts/{receiptId:D}/workflow-status");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        request.Headers.Add("X-Company-ID", companyId.ToString("D"));
+        request.Headers.CacheControl = new CacheControlHeaderValue { NoStore = true, NoCache = true };
+        using var response = await _http.SendAsync(request, cancellationToken);
+        if (!IsAuthenticated || CompanyId != companyId || _token != token)
+            throw new UnauthorizedAccessException("LoanHub session changed while checking signing attempt.");
+        if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+            throw new UnauthorizedAccessException("LoanHub denied signing attempt status.");
+        response.EnsureSuccessStatusCode();
+        var status = await response.Content.ReadFromJsonAsync<LoanHubContractWorkflowStatus>(
+            cancellationToken: cancellationToken);
+        if (status is null || status.ContractId != contractId || status.ReceiptId != receiptId ||
+            (status.CandidateArchived && (status.CandidateSha256 is not { Length: 64 } ||
+                !status.CandidateSha256.All(c => c is >= '0' and <= '9' or >= 'a' and <= 'f'))))
+            throw new InvalidOperationException("LoanHub returned invalid signing attempt status.");
+        return status;
+    }
+
     public void Logout() { _token = null; User = null; CompanyId = null; }
     public void Dispose() { Logout(); _http.Dispose(); }
 
