@@ -241,6 +241,35 @@ public sealed class LoanHubSession : IDisposable
         return status;
     }
 
+    /// <summary>List receipt identifiers for an exact contract without changing signing state.</summary>
+    public async Task<LoanHubSigningAttemptList> GetContractSigningAttemptsAsync(
+        Guid contractId, CancellationToken cancellationToken = default)
+    {
+        if (!IsAuthenticated || CompanyId is null || contractId == Guid.Empty)
+            throw new UnauthorizedAccessException("Authenticated company and contract required.");
+        var companyId = CompanyId.Value;
+        var token = _token;
+        using var request = new HttpRequestMessage(HttpMethod.Get,
+            $"api/v1/wacom-pdf-candidate-verification/contracts/{contractId:D}/attempts");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        request.Headers.Add("X-Company-ID", companyId.ToString("D"));
+        request.Headers.CacheControl = new CacheControlHeaderValue { NoStore = true, NoCache = true };
+        using var response = await _http.SendAsync(request, cancellationToken);
+        if (!IsAuthenticated || CompanyId != companyId || _token != token)
+            throw new UnauthorizedAccessException("LoanHub session changed during attempt retrieval.");
+        if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+            throw new UnauthorizedAccessException("LoanHub denied signing attempt access.");
+        response.EnsureSuccessStatusCode();
+        var result = await response.Content.ReadFromJsonAsync<LoanHubSigningAttemptList>(
+            cancellationToken: cancellationToken);
+        if (result is null || result.ContractId != contractId ||
+            result.Attempts is null || result.Attempts.Count > 100 ||
+            result.Attempts.Any(a => a.ReceiptId == Guid.Empty) ||
+            result.Attempts.Select(a => a.ReceiptId).Distinct().Count() != result.Attempts.Count)
+            throw new InvalidOperationException("LoanHub returned inconsistent signing attempts.");
+        return result;
+    }
+
     public void Logout() { _token = null; User = null; CompanyId = null; }
     public void Dispose() { Logout(); _http.Dispose(); }
 
@@ -303,4 +332,18 @@ public sealed class CompanyLoanRow
         $"{FolioNumber ?? LoanReference}   |   {LoanReference}   |   {Status}   |   " +
         $"Principal LSL {Principal:N2}   |   Balance LSL {Balance:N2}" +
         (IsTopUp ? "   |   TOP-UP" : "");
+}
+
+public sealed class LoanHubSigningAttemptList
+{
+    [JsonPropertyName("contract_id")] public Guid ContractId { get; set; }
+    [JsonPropertyName("attempts")] public List<LoanHubSigningAttempt>? Attempts { get; set; }
+    [JsonPropertyName("truncated")] public bool Truncated { get; set; }
+}
+
+public sealed class LoanHubSigningAttempt
+{
+    [JsonPropertyName("receipt_id")] public Guid ReceiptId { get; set; }
+    [JsonPropertyName("status")] public string? Status { get; set; }
+    [JsonPropertyName("reserved_at")] public DateTimeOffset ReservedAt { get; set; }
 }
