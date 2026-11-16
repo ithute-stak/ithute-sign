@@ -119,6 +119,7 @@ public sealed partial class MainWindow : Window
             CompanyLoansList.ItemsSource = null;
             OpenSelectedLoanDesk.IsEnabled = false;
             RefreshSelectedContractStatus.IsEnabled = false;
+            ClearSigningAttemptSelection();
             SelectedContractWorkflowStatus.Text = "Contract status not checked.";
             CompanyLoanDetails.Text = "";
             SelectedLoanContractContext.Text = "Select a loan to see its borrower and contract context.";
@@ -193,6 +194,7 @@ public sealed partial class MainWindow : Window
             _companyLoans = Array.Empty<CompanyLoanRow>();
             CompanyLoansList.ItemsSource = null;
             RefreshSelectedContractStatus.IsEnabled = false;
+            ClearSigningAttemptSelection();
             SelectedContractWorkflowStatus.Text = "Contract status not checked.";
             CompanyLoanDetails.Text = "";
             SelectedLoanContractContext.Text = "Select a loan to see its borrower and contract context.";
@@ -225,6 +227,7 @@ public sealed partial class MainWindow : Window
 
     private void CompanyLoansList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        ClearSigningAttemptSelection();
         var loan = CompanyLoansList.SelectedItem as CompanyLoanRow;
         bool authorized = loan is not null && _loanHubSession?.IsAuthenticated == true &&
             _loanHubSession.CompanyId == loan.CompanyId &&
@@ -250,6 +253,15 @@ public sealed partial class MainWindow : Window
             : "";
     }
 
+    private void ClearSigningAttemptSelection()
+    {
+        _attemptsForContractId = null;
+        _attemptsSession = null;
+        _attemptsLoan = null;
+        SigningAttemptPicker.ItemsSource = null;
+        SigningAttemptPicker.SelectedItem = null;
+    }
+
     private Guid? _attemptsForContractId;
     private LoanHubSession? _attemptsSession;
     private CompanyLoanRow? _attemptsLoan;
@@ -263,10 +275,7 @@ public sealed partial class MainWindow : Window
     {
         var session = _loanHubSession;
         var loan = CompanyLoansList.SelectedItem as CompanyLoanRow;
-        SigningAttemptPicker.ItemsSource = null;
-        _attemptsForContractId = null;
-        _attemptsSession = null;
-        _attemptsLoan = null;
+        ClearSigningAttemptSelection();
         if (session?.IsAuthenticated != true || loan is null ||
             session.CompanyId != loan.CompanyId || !_companyLoans.Any(r => ReferenceEquals(r, loan)) ||
             !_embeddedDeskReady || EmbeddedDesk.Source is not Uri uri ||
