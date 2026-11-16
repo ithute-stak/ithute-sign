@@ -184,6 +184,34 @@ public sealed class LoanHubSession : IDisposable
         throw new InvalidOperationException("Loan listing exceeded 10,000 records. Pagination support is required.");
     }
 
+    /// <summary>Read-only exact-contract workflow status using this session's private bearer token.</summary>
+    public async Task<LoanHubContractWorkflowStatus> GetContractWorkflowStatusAsync(
+        Guid contractId, CancellationToken cancellationToken = default)
+    {
+        if (!IsAuthenticated || CompanyId is null || contractId == Guid.Empty)
+            throw new UnauthorizedAccessException("Authenticated staff and exact contract required.");
+        var companyId = CompanyId.Value;
+        var token = _token;
+        using var request = new HttpRequestMessage(HttpMethod.Get,
+            $"api/v1/wacom-pdf-candidate-verification/contracts/{contractId:D}/workflow-status");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        request.Headers.Add("X-Company-ID", companyId.ToString("D"));
+        request.Headers.CacheControl = new CacheControlHeaderValue { NoStore = true, NoCache = true };
+        using var response = await _http.SendAsync(request, cancellationToken);
+        if (!IsAuthenticated || CompanyId != companyId || _token != token)
+            throw new UnauthorizedAccessException("LoanHub session changed while checking contract.");
+        if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+            throw new UnauthorizedAccessException("LoanHub denied contract workflow status.");
+        response.EnsureSuccessStatusCode();
+        var status = await response.Content.ReadFromJsonAsync<LoanHubContractWorkflowStatus>(
+            cancellationToken: cancellationToken);
+        if (status is null || status.ContractId != contractId ||
+            (status.CandidateArchived && (status.CandidateSha256 is not { Length: 64 } ||
+                !status.CandidateSha256.All(c => c is >= '0' and <= '9' or >= 'a' and <= 'f'))))
+            throw new InvalidOperationException("LoanHub returned invalid contract workflow status.");
+        return status;
+    }
+
     public void Logout() { _token = null; User = null; CompanyId = null; }
     public void Dispose() { Logout(); _http.Dispose(); }
 
