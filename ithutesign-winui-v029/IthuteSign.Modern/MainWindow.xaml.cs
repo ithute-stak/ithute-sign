@@ -227,6 +227,10 @@ public sealed partial class MainWindow : Window
             loan.Id != Guid.Empty && loan.BorrowerId != Guid.Empty &&
             _companyLoans.Any(row => ReferenceEquals(row, loan));
         OpenSelectedLoanDesk.IsEnabled = authorized;
+        RefreshSelectedContractStatus.IsEnabled = authorized;
+        SelectedContractWorkflowStatus.Text = authorized
+            ? "Select the exact contract in the Wacom desk before checking signed status."
+            : "Contract status not checked.";
         SelectedLoanDeskStatus.Text = authorized
             ? "Loan selected. The secure Wacom desk requires its own verified workstation session."
             : "Select an authorized company loan first.";
@@ -240,6 +244,25 @@ public sealed partial class MainWindow : Window
               $"Total: LSL {loan.TotalRepayable:N2} | Balance: LSL {loan.Balance:N2}" +
               (loan.MaturityDate is null ? "" : $" | Maturity: {loan.MaturityDate:dd MMM yyyy}")
             : "";
+    }
+
+    private async void RefreshSelectedContractStatus_Click(object sender, RoutedEventArgs e)
+    {
+        var session = _loanHubSession;
+        var loan = CompanyLoansList.SelectedItem as CompanyLoanRow;
+        if (session?.IsAuthenticated != true || loan is null ||
+            session.CompanyId != loan.CompanyId ||
+            !_companyLoans.Any(row => ReferenceEquals(row, loan)))
+        {
+            SelectedContractWorkflowStatus.Text = "Select an authorized company loan first.";
+            return;
+        }
+        // Loan IDs are not contract IDs. Do not guess a contract identifier
+        // from a loan reference or report another contract's signing status.
+        SelectedContractWorkflowStatus.Text =
+            "Select the exact contract in the Wacom desk to verify its signing status. " +
+            "A loan alone does not identify a unique contract.";
+        await Task.CompletedTask;
     }
 
     private void OpenSelectedLoanDesk_Click(object sender, RoutedEventArgs e)
