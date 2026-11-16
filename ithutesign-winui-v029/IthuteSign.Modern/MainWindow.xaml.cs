@@ -281,9 +281,20 @@ public sealed partial class MainWindow : Window
             if (!Guid.TryParse(contractText, out var contractId) || contractId == Guid.Empty)
                 throw new InvalidOperationException("No exact contract is selected in the workstation desk.");
             var status = await session.GetContractWorkflowStatusAsync(contractId);
+            // Contract selection can change during the network request. Never
+            // show a different contract's status under the current selection.
             if (!ReferenceEquals(session, _loanHubSession) || !session.IsAuthenticated ||
                 !ReferenceEquals(loan, CompanyLoansList.SelectedItem))
                 return;
+            var currentJson = await EmbeddedDesk.ExecuteScriptAsync(
+                "(function(){const p=document.querySelector('select#contract_id');" +
+                "return p && p.selectedOptions.length ? p.value : null;})()");
+            if (!Guid.TryParse(JsonSerializer.Deserialize<string?>(currentJson), out var currentContractId) ||
+                currentContractId != contractId)
+            {
+                SelectedContractWorkflowStatus.Text = "Contract selection changed. Check status again.";
+                return;
+            }
             SelectedContractWorkflowStatus.Text = status.ContractSigned
                 ? $"Contract {contractId:D}: LoanHub reports signed. Verify the stored signed PDF."
                 : $"Contract {contractId:D}: NOT SIGNED. " +
