@@ -261,12 +261,50 @@ public sealed partial class MainWindow : Window
             SelectedContractWorkflowStatus.Text = "Select an authorized company loan first.";
             return;
         }
-        // Loan IDs are not contract IDs. Do not guess a contract identifier
-        // from a loan reference or report another contract's signing status.
-        SelectedContractWorkflowStatus.Text =
-            "Select the exact contract in the Wacom desk to verify its signing status. " +
-            "A loan alone does not identify a unique contract.";
-        await Task.CompletedTask;
+        // The connector UI owns exact contract selection; never infer contract
+        // identity from the loan UUID or an untrusted page origin.
+        if (!_embeddedDeskReady || EmbeddedDesk.Source is not Uri deskUri ||
+            deskUri.Scheme != Uri.UriSchemeHttp || deskUri.Host != "127.0.0.1" ||
+            deskUri.Port != 8767 || !string.IsNullOrEmpty(deskUri.UserInfo))
+        {
+            SelectedContractWorkflowStatus.Text = "Open the local Wacom desk and select the exact contract first.";
+            return;
+        }
+        RefreshSelectedContractStatus.IsEnabled = false;
+        SelectedContractWorkflowStatus.Text = "Checking exact contract status in LoanHub...";
+        try
+        {
+            var json = await EmbeddedDesk.ExecuteScriptAsync(
+                "(function(){const p=document.querySelector('select#contract_id');" +
+                "return p && p.selectedOptions.length ? p.value : null;})()");
+            var contractText = JsonSerializer.Deserialize<string?>(json);
+            if (!Guid.TryParse(contractText, out var contractId) || contractId == Guid.Empty)
+                throw new InvalidOperationException("No exact contract is selected in the workstation desk.");
+            var status = await session.GetContractWorkflowStatusAsync(contractId);
+            if (!ReferenceEquals(session, _loanHubSession) || !session.IsAuthenticated ||
+                !ReferenceEquals(loan, CompanyLoansList.SelectedItem))
+                return;
+            SelectedContractWorkflowStatus.Text = status.ContractSigned
+                ? $"Contract {contractId:D}: LoanHub reports signed. Verify the stored signed PDF."
+                : $"Contract {contractId:D}: NOT SIGNED. " +
+                  $"Candidate archived: {status.CandidateArchived}; " +
+                  $"Borrower affirmed: {status.BorrowerAffirmed}; " +
+                  $"Workstation proof: {status.WorkstationKeyVerified}; " +
+                  $"Physical STU-540 proof: {status.PhysicalStu540Verified}; " +
+                  $"Legal execution: {status.LegalExecutionVerified}.";
+        }
+        catch (Exception ex)
+        {
+            if (ReferenceEquals(session, _loanHubSession) &&
+                ReferenceEquals(loan, CompanyLoansList.SelectedItem))
+                SelectedContractWorkflowStatus.Text = "Contract status unavailable: " + ex.Message;
+        }
+        finally
+        {
+            if (ReferenceEquals(session, _loanHubSession) &&
+                ReferenceEquals(loan, CompanyLoansList.SelectedItem))
+                RefreshSelectedContractStatus.IsEnabled = true;
+        }
     }
 
     private void OpenSelectedLoanDesk_Click(object sender, RoutedEventArgs e)
