@@ -27,6 +27,7 @@ from loanhub_company_identity import company_for_user
 from loanhub_auth import LoanHubLoginTransport
 from loanhub_presentation import employee_display_name
 from loanhub_loans_dialog import LoanHubLoansDialog
+from whatsapp_dialog import WhatsAppDeliveryDialog
 
 def decorate_action(button, label):
     """Use native Qt icons so Linux and Windows need no extra icon packages."""
@@ -253,6 +254,7 @@ class Window(QMainWindow):
         self.position = None
         self.signatures = []
         self.recent_documents = []
+        self.last_signed_pdf = None
         self.loanhub_access_token = None
         self.loanhub_user = None
         self.loanhub_company = None
@@ -371,6 +373,11 @@ class Window(QMainWindow):
         loans_button.setMinimumHeight(56)
         loans_button.clicked.connect(self.open_loanhub_loans)
         home.addWidget(loans_button)
+        whatsapp_button = QPushButton("Send signed PDF via WhatsApp")
+        whatsapp_button.setObjectName("quickAction")
+        whatsapp_button.setMinimumHeight(56)
+        whatsapp_button.clicked.connect(self.send_signed_whatsapp)
+        home.addWidget(whatsapp_button)
         home.addWidget(recent_heading)
         self.home_recent = QLabel("No documents opened yet")
         self.home_recent.setWordWrap(True)
@@ -889,6 +896,7 @@ class Window(QMainWindow):
         self.loanhub_access_token = None
         self.loanhub_user = None
         self.loanhub_company = None
+        self.last_signed_pdf = None
         self.loanhub_login_status.setText("LoanHub: Not signed in")
         if hasattr(self, "loanhub_session_button"):
             self.loanhub_session_button.setText("Log in to LoanHub")
@@ -1139,9 +1147,20 @@ class Window(QMainWindow):
         try:
             signed_pdf = sign_pdf_many(self.preview_pdf, self.signatures, output,
                                        source_document=self.source)
+            self.last_signed_pdf = signed_pdf
             QMessageBox.information(self, "Saved", "Signed PDF saved:\\n" + signed_pdf)
         except Exception as exc:
             QMessageBox.critical(self, "Save failed", str(exc))
+    def send_signed_whatsapp(self):
+        if not self.loanhub_access_token or not self.loanhub_company:
+            QMessageBox.warning(self, "WhatsApp", "Sign in and verify your company first.")
+            return
+        if not self.last_signed_pdf or not Path(self.last_signed_pdf).is_file():
+            QMessageBox.warning(self, "WhatsApp", "Save a signed PDF before sending.")
+            return
+        WhatsAppDeliveryDialog(self.loanhub_access_token, self.loanhub_company,
+                               self.last_signed_pdf, self).exec()
+
     def closeEvent(self, event):
         self.logout_loanhub()
         if self.doc is not None:
