@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+HERE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+SDK="${WACOM_STU_SDK_LINUX:-$HOME/wacom-stu-sdk/sdk-extracted/Linux}"
+JAR="$SDK/any/wgssSTU.jar"
+NATIVE="$SDK/x86_64"
+if [[ ! -f "$JAR" || ! -d "$NATIVE" ]]; then
+  echo "Wacom Linux SDK missing. Set WACOM_STU_SDK_LINUX to its Linux directory." >&2
+  exit 11
+fi
+BUILD="${XDG_CACHE_HOME:-$HOME/.cache}/ithutesign/stu-java"
+mkdir -p "$BUILD"
+if [[ ! -f "$BUILD/STUCapture.class" || "$HERE/STUCapture.java" -nt "$BUILD/STUCapture.class" ]]; then
+  javac -cp "$JAR" -d "$BUILD" "$HERE/STUCapture.java"
+fi
+exec java --enable-native-access=ALL-UNNAMED -Djava.library.path="$NATIVE" -cp "$BUILD:$JAR" STUCapture "$@"
