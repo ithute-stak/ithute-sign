@@ -23,6 +23,7 @@ from device import probe_bridge, show_screen, validate_signature_png
 from geometry import fit_rectangle
 from loanhub import detect_loanhub, save_loanhub_signed
 from loanhub_login_dialog import LoanHubLoginDialog
+from loanhub_company_dialog import LoanHubCompanyDialog
 
 def root_folder():
     if getattr(sys, "frozen", False):
@@ -230,6 +231,7 @@ class Window(QMainWindow):
         self.recent_documents = []
         self.loanhub_access_token = None
         self.loanhub_user = None
+        self.loanhub_company = None
         base = QWidget()
         self.setCentralWidget(base)
         layout = QHBoxLayout(base)
@@ -867,6 +869,22 @@ class Window(QMainWindow):
             self.loanhub_account_note.setText(
                 "LoanHub identity verified. Company membership and document access are pending.")
             self.screen_stack.setCurrentWidget(self.home_panel)
+            self.select_loanhub_company()
+
+    def select_loanhub_company(self):
+        """Company access requires explicit verified active membership."""
+        if not self.loanhub_access_token or not self.loanhub_user:
+            QMessageBox.warning(self, "LoanHub", "Sign in before selecting a company.")
+            return
+        self.loanhub_company = None
+        memberships = self.loanhub_user.get("memberships", [])
+        dialog = LoanHubCompanyDialog(memberships, self)
+        if dialog.exec() == QDialog.Accepted and dialog.company:
+            self.loanhub_company = dialog.company
+            self.loanhub_login_status.setText(
+                "LoanHub: " + self.loanhub_company["name"])
+            self.loanhub_account_note.setText(
+                "Company selected. Client and contract access is not yet enabled.")
 
     def auto_sign_loanhub(self):
         """Offline, fail-closed workflow for the verified LoanHub contract layout."""
