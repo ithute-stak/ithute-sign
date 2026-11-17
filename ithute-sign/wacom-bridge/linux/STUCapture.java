@@ -21,10 +21,33 @@ public final class STUCapture {
     private Tablet tablet;
     private int maxX, maxY;
     private JPanel canvas;
+    private volatile JDialog signingDialog;
+    private volatile boolean deviceControls;
+    private boolean buttonDown;
+    private int screenWidth, screenHeight;
 
     private synchronized void pen(PenData data) {
         if (cancelled || accepted) return;
         boolean down = data.getSw() != 0 && data.getPressure() > 0;
+        // Device buttons occupy the bottom strip; never add their touches to signature ink.
+        int sx = (int)Math.round(data.getX() * (screenWidth - 1.0) / maxX);
+        int sy = (int)Math.round(data.getY() * (screenHeight - 1.0) / maxY);
+        if (deviceControls && (buttonDown || sy >= screenHeight * 0.83)) {
+            if (down && !buttonDown && sy >= screenHeight * 0.83) {
+                buttonDown = true;
+                final int action = sx < screenWidth / 3 ? 0 : sx < screenWidth * 2 / 3 ? 1 : 2;
+                SwingUtilities.invokeLater(() -> {
+                    if (signingDialog == null || !signingDialog.isDisplayable()) return;
+                    if (action == 0) clear();
+                    else if (action == 1) { cancelled = true; signingDialog.dispose(); }
+                    else if (points() >= 3) { accepted = true; signingDialog.dispose(); }
+                    else JOptionPane.showMessageDialog(signingDialog, "Please sign before accepting.");
+                });
+            }
+            if (!down) buttonDown = false;
+            current = null;
+            return;
+        }
         if (!down) { current = null; return; }
         if (current == null) { current = new ArrayList<>(); strokes.add(current); }
         current.add(new Point2D.Double(Math.max(0, Math.min(W - 1, data.getX() * (W - 1.0) / maxX)),
@@ -34,7 +57,7 @@ public final class STUCapture {
     private synchronized void clear() {
         strokes.clear(); current = null;
         if (canvas != null) canvas.repaint();
-        try { tablet.setClearScreen(); } catch (Exception ignored) { }
+        try { if (deviceControls) drawDeviceControls(); else tablet.setClearScreen(); } catch (Exception ignored) { }
     }
     private synchronized int points() {
         int n = 0; for (var stroke : strokes) n += stroke.size(); return n;
@@ -51,6 +74,42 @@ public final class STUCapture {
             else g.draw(path);
         }
     }
+    private void drawDeviceControls() throws Exception {
+        BufferedImage img = new BufferedImage(screenWidth, screenHeight, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = img.createGraphics();
+        try {
+            g.setColor(Color.WHITE); g.fillRect(0, 0, screenWidth, screenHeight);
+            g.setColor(new Color(16, 51, 82));
+            g.fillRect(0, 0, screenWidth, Math.max(32, screenHeight / 10));
+            g.setColor(Color.WHITE);
+            g.setFont(new Font("SansSerif", Font.BOLD, Math.max(14, screenHeight / 20)));
+            g.drawString("ITHUTESIGN  -  Sign below", 16, Math.max(23, screenHeight / 15));
+            int top = (int)(screenHeight * 0.83);
+            String[] labels = {"CLEAR", "CANCEL", "ACCEPT"};
+            Color[] colors = {new Color(16, 51, 82), new Color(115, 49, 49), new Color(24, 125, 78)};
+            for (int i = 0; i < 3; i++) {
+                int x = i * screenWidth / 3;
+                int right = (i + 1) * screenWidth / 3;
+                g.setColor(colors[i]); g.fillRect(x + 2, top, right - x - 4, screenHeight - top);
+                g.setColor(Color.WHITE);
+                g.setFont(new Font("SansSerif", Font.BOLD, Math.max(13, screenHeight / 18)));
+                FontMetrics fm = g.getFontMetrics();
+                g.drawString(labels[i], x + (right - x - fm.stringWidth(labels[i])) / 2,
+                    top + (screenHeight - top + fm.getAscent()) / 2 - 3);
+            }
+        } finally { g.dispose(); }
+        byte[] pixels = new byte[screenWidth * screenHeight * 3];
+        int at = 0;
+        for (int y = 0; y < screenHeight; y++) for (int x = 0; x < screenWidth; x++) {
+            int rgb = img.getRGB(x, y);
+            pixels[at++] = (byte)(rgb >>> 16);
+            pixels[at++] = (byte)(rgb >>> 8);
+            pixels[at++] = (byte)rgb;
+        }
+        tablet.setInkingMode(InkingMode.Off);
+        tablet.writeImage(EncodingMode.EncodingMode_24bit, pixels);
+        tablet.setInkingMode(InkingMode.On);
+    }
     private void capture(Path output) throws Exception {
         UsbDevice device = find();
         if (device == null) throw new IllegalStateException("STU-540 not detected");
@@ -60,6 +119,7 @@ public final class STUCapture {
             if (status != 0 || !tablet.isConnected()) throw new IllegalStateException("Tablet connection failed: " + status);
             Capability cap = tablet.getCapability();
             maxX = cap.getTabletMaxX(); maxY = cap.getTabletMaxY();
+            screenWidth = cap.getScreenWidth(); screenHeight = cap.getScreenHeight();
             if (maxX <= 0 || maxY <= 0) throw new IllegalStateException("Invalid tablet dimensions");
             ITabletHandler handler = (ITabletHandler) Proxy.newProxyInstance(
                 ITabletHandler.class.getClassLoader(), new Class<?>[]{ITabletHandler.class},
@@ -70,11 +130,18 @@ public final class STUCapture {
                     return null;
                 });
             tablet.addTabletHandler(handler);
-            tablet.setClearScreen();
-            tablet.setInkingMode(InkingMode.On);
+            if (deviceControls) {
+                if (screenWidth <= 0 || screenHeight <= 0 || screenWidth > 4096 || screenHeight > 4096)
+                    throw new IllegalStateException("Invalid STU display dimensions");
+                drawDeviceControls();
+            } else {
+                tablet.setClearScreen();
+                tablet.setInkingMode(InkingMode.On);
+            }
             SwingUtilities.invokeAndWait(() -> {
                 JDialog dialog = new JDialog((Frame)null, "IthuteSign | STU-540 signature", true);
                 dialog.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+                signingDialog = dialog;
                 canvas = new JPanel() {
                     protected void paintComponent(Graphics g) {
                         super.paintComponent(g);
@@ -137,6 +204,7 @@ public final class STUCapture {
                     public void windowClosing(WindowEvent e) { cancelled = true; }
                 });
                 dialog.setVisible(true);
+                signingDialog = null;
             });
             if (!accepted || cancelled) throw new IllegalStateException("Signature capture cancelled");
             // Export only the actual ink, not the tablet's full 800x480 canvas.
@@ -267,7 +335,13 @@ public final class STUCapture {
             if (args.length == 1 && (args[0].equals("--welcome") || args[0].equals("--thanks"))) {
                 displayMessage(args[0].equals("--thanks")); return;
             }
-            if (args.length != 1 || args[0].startsWith("--")) { System.err.println("Usage: STUCapture --probe | output.png"); System.exit(12); }
+            if (args.length == 2 && args[0].equals("--device-controls")) {
+                STUCapture capture = new STUCapture();
+                capture.deviceControls = true;
+                capture.capture(Path.of(args[1]));
+                return;
+            }
+            if (args.length != 1 || args[0].startsWith("--")) { System.err.println("Usage: STUCapture --probe | --welcome | --thanks | [--device-controls] output.png"); System.exit(12); }
             new STUCapture().capture(Path.of(args[0]));
         } catch (UnsatisfiedLinkError e) { System.err.println("Wacom native library unavailable: " + e); System.exit(11);
         } catch (Exception e) { System.err.println(e.getMessage()); System.exit(13); }
