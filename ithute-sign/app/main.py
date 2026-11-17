@@ -233,6 +233,7 @@ class Window(QMainWindow):
         for label, handler in (("Open PDF / Word", self.open_document),
                                ("Previous", self.previous), ("Next", self.next),
                                ("Add signature", self.add_signature),
+                               ("Reuse selected signature", self.reuse_selected_signature),
                                ("Remove selected", self.remove_selected),
                                ("Device status", self.device_status),
                                ("Save signed PDF", self.save)):
@@ -387,6 +388,42 @@ class Window(QMainWindow):
             self.redraw()
         except Exception as exc:
             QMessageBox.warning(self, "Signature failed", str(exc))
+    def reuse_selected_signature(self):
+        """Place a previously captured signature elsewhere in this document.
+
+        Reuse is intentionally limited to the currently opened document.
+        """
+        if self.doc is None or self.position is None:
+            QMessageBox.warning(self, "Select position",
+                                "Click the new signature location on the PDF first.")
+            return
+        index = self.queue.currentRow()
+        if not (0 <= index < len(self.signatures)):
+            QMessageBox.warning(self, "Select signature",
+                                "Select an existing signature in the queue to reuse.")
+            return
+        original = self.signatures[index]
+        if not Path(original.signature_png).is_file():
+            QMessageBox.warning(self, "Signature unavailable",
+                                "The original signature image is no longer available.")
+            return
+        x, y = self.position
+        page = self.doc[self.page_index]
+        width, height = original.width, original.height
+        if x + width > page.rect.width or y + height > page.rect.height:
+            QMessageBox.warning(self, "Position",
+                                "Signature must fit within the page.")
+            return
+        placement = replace(original, page_index=self.page_index, x=x, y=y)
+        self.signatures.append(placement)
+        self.queue_selection_syncing = True
+        try:
+            self.queue.addItem(f"Page {self.page_index+1} | {width:g}x{height:g} pt")
+        finally:
+            self.queue_selection_syncing = False
+        self.position = None
+        self.redraw()
+
     def select_signature(self, index):
         if self.queue_selection_syncing or not (0 <= index < len(self.signatures)):
             return
@@ -448,10 +485,9 @@ class Window(QMainWindow):
         if answer != QMessageBox.Yes:
             return
         try:
-            audit = sign_pdf_many(self.preview_pdf, self.signatures, output,
-                                  source_document=self.source)
-            QMessageBox.information(self, "Saved", "Signed PDF saved:\n" + output
-                                    + "\n\nSignature-image audit:\n" + audit)
+            signed_pdf = sign_pdf_many(self.preview_pdf, self.signatures, output,
+                                       source_document=self.source)
+            QMessageBox.information(self, "Saved", "Signed PDF saved:\\n" + signed_pdf)
         except Exception as exc:
             QMessageBox.critical(self, "Save failed", str(exc))
     def closeEvent(self, event):
