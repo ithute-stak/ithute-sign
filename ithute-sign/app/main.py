@@ -444,7 +444,12 @@ class Window(QMainWindow):
             self.position = None
             self.redraw()
     def show_loanhub_progress(self, pending, completed=()):
-        """Guided signing overview; no signature dragging or online dependency."""
+        """Single guided checkpoint before each Wacom capture, with cancellation."""
+        completed_roles = set(completed)
+        remaining = [field for field in pending if field.role not in completed_roles]
+        if not remaining:
+            return True
+        next_role = remaining[0].role
         dlg = QDialog(self)
         dlg.setWindowTitle("IthuteSign — LoanHub signing")
         dlg.setMinimumWidth(520)
@@ -458,7 +463,10 @@ class Window(QMainWindow):
                 height: 14px; text-align: center; color: #18304c; }
             QProgressBar::chunk { background: #087e82; border-radius: 7px; }
             QPushButton { padding: 10px 18px; border-radius: 7px;
-                background: #087e82; color: white; font-weight: 700; }
+                background: white; color: #18304c; border: 1px solid #cbd8e6;
+                font-weight: 700; }
+            QPushButton#captureNext { background: #087e82; color: white;
+                border: 1px solid #087e82; }
         """)
         body = QVBoxLayout(dlg)
         body.setContentsMargins(26, 24, 26, 24)
@@ -467,9 +475,8 @@ class Window(QMainWindow):
         body.addWidget(heading)
         body.addWidget(QLabel("Page 7 · Annexure C · Offline signing"))
         checklist = QListWidget()
-        completed_roles = set(completed)
         for field in pending:
-            checklist.addItem(("✓  Signed  —  " if field.role in completed_roles
+            checklist.addItem(("✓  Captured  —  " if field.role in completed_roles
                                else "○  Awaiting signature  —  ") + field.role)
         checklist.setMinimumHeight(min(260, 52 * len(pending) + 20))
         body.addWidget(checklist)
@@ -477,10 +484,22 @@ class Window(QMainWindow):
         progress.setRange(0, len(pending))
         progress.setValue(len(completed_roles))
         body.addWidget(progress)
-        button = QPushButton("Continue" if len(completed_roles) < len(pending) else "Review complete")
-        button.clicked.connect(dlg.accept)
-        body.addWidget(button)
-        dlg.exec()
+        instruction = QLabel("Next: " + next_role + ". Confirm this person is present "
+                             "and ready to sign using the Wacom STU-540.")
+        instruction.setWordWrap(True)
+        body.addWidget(instruction)
+        actions = QHBoxLayout()
+        actions.addStretch()
+        cancel = QPushButton("Cancel signing")
+        cancel.clicked.connect(dlg.reject)
+        actions.addWidget(cancel)
+        capture = QPushButton("Capture " + next_role)
+        capture.setObjectName("captureNext")
+        capture.setDefault(True)
+        capture.clicked.connect(dlg.accept)
+        actions.addWidget(capture)
+        body.addLayout(actions)
+        return dlg.exec() == QDialog.Accepted
 
     def review_loanhub_signatures(self, pending, captured):
         """Review every newly captured signature before writing a PDF."""
@@ -659,26 +678,13 @@ class Window(QMainWindow):
         if not pending:
             QMessageBox.information(self, "LoanHub", "No pending witness fields found.")
             return
-        roles = "\\n".join("• " + f.role for f in pending)
-        if not self.confirm_signer(
-            "Review detected signatories",
-            "The following fields require signatures on page 7:\\n\\n"
-            + roles + "\\n\\nConfirm that the correct people are present."
-            + "\\nExisting signed records will not be overwritten.",
-            "Start signing"):
-            return
         captured = []
         try:
-            self.show_loanhub_progress(pending)
             self.page_index = 6
             self.redraw()
             for field in pending:
-                if not self.confirm_signer(
-                    "Next signatory: " + field.role,
-                    "Please ask the " + field.role
-                    + " to sign on the Wacom STU-540.\\n\\n"
-                    + "Only continue when the correct signer is ready.",
-                    "Capture signature"):
+                if not self.show_loanhub_progress(
+                        pending, [entry[0].role for entry in captured]):
                     return
                 dialog = CaptureDialog(self.temp.name, self)
                 if dialog.exec() != QDialog.Accepted:
@@ -687,7 +693,6 @@ class Window(QMainWindow):
                 dialog.export(target)
                 validate_signature_png(target)
                 captured.append((field, str(target), datetime.now().astimezone()))
-                self.show_loanhub_progress(pending, [entry[0].role for entry in captured])
             if not self.review_loanhub_signatures(pending, captured):
                 return
             default = str(Path(self.source).with_name(Path(self.source).stem + "_signed.pdf"))
