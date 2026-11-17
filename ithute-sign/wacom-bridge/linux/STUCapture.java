@@ -262,7 +262,7 @@ public final class STUCapture {
             try {
                 g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
-                g.setColor(Color.WHITE);
+                g.setColor(new Color(12, 34, 57));
                 g.fillRect(0, 0, width, height);
                 // Scale a single vector design to the actual STU display dimensions.
                 double scale = Math.min(width / 800.0, height / 480.0);
@@ -270,9 +270,9 @@ public final class STUCapture {
                 g.scale(scale, scale);
                 Color navy = new Color(16, 51, 82);
                 Color green = new Color(24, 125, 78);
-                g.setColor(new Color(238, 246, 250));
+                g.setColor(new Color(20, 55, 78));
                 g.fillRoundRect(24, 18, 752, 444, 24, 24);
-                g.setColor(navy);
+                g.setColor(new Color(229, 242, 248));
                 g.setStroke(new BasicStroke(5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
                 // Document-and-pen emblem; no external assets or image decoder required.
                 g.drawRoundRect(352, 42, 96, 116, 12, 12);
@@ -284,7 +284,7 @@ public final class STUCapture {
                 g.drawLine(444, 51, 414, 132);
                 g.setStroke(new BasicStroke(4f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
                 g.drawArc(368, 115, 58, 27, 5, 155);
-                g.setColor(navy);
+                g.setColor(Color.WHITE);
                 g.setFont(new Font("SansSerif", Font.BOLD, 44));
                 FontMetrics metrics = g.getFontMetrics();
                 String title = "ITHUTESIGN";
@@ -293,7 +293,7 @@ public final class STUCapture {
                 String subtitle = thanks ? "Thank you for signing" : "Secure Document Signing";
                 metrics = g.getFontMetrics();
                 g.drawString(subtitle, (800 - metrics.stringWidth(subtitle)) / 2, 266);
-                g.setColor(new Color(220, 239, 226));
+                g.setColor(new Color(219, 242, 227));
                 g.fillRoundRect(226, 309, 348, 78, 20, 20);
                 g.setColor(green);
                 g.setFont(new Font("SansSerif", Font.BOLD, 27));
@@ -332,17 +332,19 @@ public final class STUCapture {
                 if (find() == null) { System.err.println("STU-540 not detected"); System.exit(10); }
                 System.out.println("STU-540 detected"); return;
             }
-            if (args.length == 1 && (args[0].equals("--welcome") || args[0].equals("--thanks"))) {
+            if (args.length == 1 && (args[0].equals("--welcome") || args[0].equals("--idle") || args[0].equals("--thanks"))) {
                 displayMessage(args[0].equals("--thanks")); return;
             }
             if (args.length == 2 && args[0].equals("--device-controls")) {
                 STUCapture capture = new STUCapture();
                 capture.deviceControls = true;
-                capture.capture(Path.of(args[1]));
+                try { capture.capture(Path.of(args[1])); }
+                finally { try { displayMessage(false); } catch (Exception e) { System.err.println("Idle screen unavailable: " + e.getMessage()); } }
                 return;
             }
-            if (args.length != 1 || args[0].startsWith("--")) { System.err.println("Usage: STUCapture --probe | --welcome | --thanks | [--device-controls] output.png"); System.exit(12); }
-            new STUCapture().capture(Path.of(args[0]));
+            if (args.length != 1 || args[0].startsWith("--")) { System.err.println("Usage: STUCapture --probe | --idle | --welcome | --thanks | [--device-controls] output.png"); System.exit(12); }
+            try { new STUCapture().capture(Path.of(args[0])); }
+            finally { try { displayMessage(false); } catch (Exception e) { System.err.println("Idle screen unavailable: " + e.getMessage()); } }
         } catch (UnsatisfiedLinkError e) { System.err.println("Wacom native library unavailable: " + e); System.exit(11);
         } catch (Exception e) { System.err.println(e.getMessage()); System.exit(13); }
     }
