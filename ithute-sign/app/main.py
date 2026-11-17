@@ -17,7 +17,7 @@ from PySide6.QtCore import Qt, QRectF
 from PySide6.QtGui import QPixmap, QImage, QPainter, QPen, QColor
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QLabel, QPushButton,
     QVBoxLayout, QHBoxLayout, QFileDialog, QMessageBox, QScrollArea, QSpinBox,
-    QDialog, QDialogButtonBox, QListWidget, QProgressBar, QStackedWidget)
+    QDialog, QDialogButtonBox, QListWidget, QProgressBar, QStackedWidget, QStyle)
 from document import to_pdf, sign_pdf_many, Placement, sha256
 from device import probe_bridge, show_screen, validate_signature_png
 from geometry import fit_rectangle
@@ -25,6 +25,28 @@ from loanhub import detect_loanhub, save_loanhub_signed
 from loanhub_login_dialog import LoanHubLoginDialog
 from loanhub_company_identity import company_for_user
 from loanhub_auth import LoanHubLoginTransport
+from loanhub_presentation import employee_display_name
+
+def decorate_action(button, label):
+    """Use native Qt icons so Linux and Windows need no extra icon packages."""
+    icons = {
+        "Log in to LoanHub": QStyle.SP_DialogApplyButton,
+        "Log out of LoanHub": QStyle.SP_DialogCancelButton,
+        "Open PDF / Word": QStyle.SP_DialogOpenButton,
+        "Auto-sign LoanHub": QStyle.SP_FileDialogDetailedView,
+        "Add signature": QStyle.SP_FileDialogNewFolder,
+        "Reuse selected signature": QStyle.SP_BrowserReload,
+        "Remove selected": QStyle.SP_TrashIcon,
+        "Device status": QStyle.SP_ComputerIcon,
+        "Save signed PDF": QStyle.SP_DialogSaveButton,
+        "Check Wacom": QStyle.SP_ComputerIcon,
+    }
+    icon = icons.get(label)
+    if icon is not None:
+        button.setIcon(button.style().standardIcon(icon))
+    button.setCursor(Qt.PointingHandCursor)
+    return button
+
 
 def root_folder():
     if getattr(sys, "frozen", False):
@@ -249,6 +271,7 @@ class Window(QMainWindow):
         menu.addWidget(brand)
         menu.addWidget(QLabel("OFFLINE SIGNING WORKSPACE"))
         login_button = QPushButton("Log in to LoanHub")
+        decorate_action(login_button, "Log in to LoanHub")
         login_button.setObjectName("primary")
         login_button.setMinimumHeight(42)
         login_button.clicked.connect(self.toggle_loanhub_session)
@@ -274,7 +297,7 @@ class Window(QMainWindow):
                 button = QPushButton(label)
                 button.setObjectName("primary" if label in ("Auto-sign LoanHub", "Save signed PDF") else "menuButton")
                 button.setMinimumHeight(42)
-                button.setCursor(Qt.PointingHandCursor)
+                decorate_action(button, label)
                 button.clicked.connect(handler)
                 menu.addWidget(button)
             menu.addSpacing(14)
@@ -320,7 +343,7 @@ class Window(QMainWindow):
         self.loanhub_account_name = QLabel("LoanHub account: Not signed in")
         self.loanhub_account_name.setObjectName("pageHeading")
         home.addWidget(self.loanhub_account_name)
-        self.loanhub_account_note = QLabel("Sign in to verify your employee identity. Company selection will follow.")
+        self.loanhub_account_note = QLabel("Sign in to access your verified LoanHub company.")
         self.loanhub_account_note.setWordWrap(True)
         home.addWidget(self.loanhub_account_note)
         shortcuts = QHBoxLayout()
@@ -329,6 +352,7 @@ class Window(QMainWindow):
                                ("Check Wacom", self.device_status)):
             action = QPushButton(label)
             action.setMinimumHeight(44)
+            decorate_action(action, label)
             action.clicked.connect(handler)
             shortcuts.addWidget(action)
         home.addLayout(shortcuts)
@@ -850,13 +874,14 @@ class Window(QMainWindow):
         self.loanhub_login_status.setText("LoanHub: Not signed in")
         if hasattr(self, "loanhub_session_button"):
             self.loanhub_session_button.setText("Log in to LoanHub")
+            decorate_action(self.loanhub_session_button, "Log in to LoanHub")
             self.loanhub_session_button.setObjectName("primary")
             self.loanhub_session_button.style().unpolish(self.loanhub_session_button)
             self.loanhub_session_button.style().polish(self.loanhub_session_button)
         if hasattr(self, "loanhub_account_name"):
             self.loanhub_account_name.setText("LoanHub account: Not signed in")
             self.loanhub_account_note.setText(
-                "Signed out. Sign in with a LoanHub employee account to select a company.")
+                "Signed out. Sign in with your LoanHub employee account.")
         if hasattr(self, "screen_stack") and hasattr(self, "home_panel"):
             self.screen_stack.setCurrentWidget(self.home_panel)
 
@@ -873,15 +898,14 @@ class Window(QMainWindow):
         dialog = LoanHubLoginDialog(self)
         if dialog.exec() == QDialog.Accepted and dialog.access_token and dialog.verified_user:
             self.loanhub_session_button.setText("Log out of LoanHub")
+            decorate_action(self.loanhub_session_button, "Log out of LoanHub")
             self.loanhub_session_button.setObjectName("menuButton")
             self.loanhub_session_button.style().unpolish(self.loanhub_session_button)
             self.loanhub_session_button.style().polish(self.loanhub_session_button)
             self.loanhub_access_token = dialog.access_token
             self.loanhub_user = dialog.verified_user
             self.loanhub_login_status.setText("LoanHub: Identity verified (company not selected)")
-            display = (self.loanhub_user.get("full_name")
-                       or self.loanhub_user.get("name")
-                       or self.loanhub_user.get("phone") or "Employee")
+            display = employee_display_name(self.loanhub_user)
             self.loanhub_account_name.setText("Welcome, " + str(display))
             self.loanhub_account_note.setText(
                 "LoanHub identity verified. Company membership and document access are pending.")
