@@ -146,6 +146,61 @@ public final class STUCapture {
             }
         }
     }
+    /** Draw a temporary on-screen message. Never changes ROM or boot image. */
+    private static void displayMessage(boolean thanks) throws Exception {
+        UsbDevice device = find();
+        if (device == null) throw new IllegalStateException("STU-540 not detected");
+        Tablet screen = new Tablet();
+        try {
+            int status = screen.usbConnect(device, true);
+            if (status != 0 || !screen.isConnected())
+                throw new IllegalStateException("Tablet connection failed: " + status);
+            Capability cap = screen.getCapability();
+            int width = cap.getScreenWidth();
+            int height = cap.getScreenHeight();
+            if (width <= 0 || height <= 0 || width > 4096 || height > 4096)
+                throw new IllegalStateException("Invalid STU screen dimensions");
+            BufferedImage picture = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+            Graphics2D g = picture.createGraphics();
+            try {
+                g.setColor(Color.WHITE);
+                g.fillRect(0, 0, width, height);
+                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g.setColor(new Color(16, 51, 82));
+                g.setFont(new Font("SansSerif", Font.BOLD, Math.max(22, width / 19)));
+                String title = "ITHUTESIGN";
+                FontMetrics metrics = g.getFontMetrics();
+                g.drawString(title, (width - metrics.stringWidth(title)) / 2, height / 3);
+                g.setFont(new Font("SansSerif", Font.PLAIN, Math.max(15, width / 33)));
+                String line = thanks ? "Thank you for signing" : "Secure Document Signing";
+                metrics = g.getFontMetrics();
+                g.drawString(line, (width - metrics.stringWidth(line)) / 2, height / 2);
+                String instruction = thanks ? "Signature captured" : "Ready to Sign";
+                g.setFont(new Font("SansSerif", Font.BOLD, Math.max(16, width / 30)));
+                metrics = g.getFontMetrics();
+                g.drawString(instruction, (width - metrics.stringWidth(instruction)) / 2,
+                             height * 2 / 3);
+            } finally {
+                g.dispose();
+            }
+            // Wacom 24-bit mode takes packed RGB pixel data, not PNG bytes.
+            byte[] pixels = new byte[width * height * 3];
+            int at = 0;
+            for (int y = 0; y < height; y++) {
+                for (int x = 0; x < width; x++) {
+                    int rgb = picture.getRGB(x, y);
+                    pixels[at++] = (byte)((rgb >>> 16) & 255);
+                    pixels[at++] = (byte)((rgb >>> 8) & 255);
+                    pixels[at++] = (byte)(rgb & 255);
+                }
+            }
+            screen.setInkingMode(InkingMode.Off);
+            screen.writeImage(EncodingMode.EncodingMode_24bit, pixels);
+            System.out.println("STU-540 display image sent");
+        } finally {
+            try { screen.disconnect(); } catch (Exception ignored) {}
+        }
+    }
     private static UsbDevice find() {
         for (UsbDevice d : UsbDevice.getUsbDevices())
             if ((d.getIdVendor() & 0xffff) == 0x056a && (d.getIdProduct() & 0xffff) == 0x00a8) return d;
@@ -158,8 +213,7 @@ public final class STUCapture {
                 System.out.println("STU-540 detected"); return;
             }
             if (args.length == 1 && (args[0].equals("--welcome") || args[0].equals("--thanks"))) {
-                if (find() == null) System.exit(10);
-                System.out.println("STU-540 detected; display branding not supported on Linux yet"); return;
+                displayMessage(args[0].equals("--thanks")); return;
             }
             if (args.length != 1 || args[0].startsWith("--")) { System.err.println("Usage: STUCapture --probe | output.png"); System.exit(12); }
             new STUCapture().capture(Path.of(args[0]));
