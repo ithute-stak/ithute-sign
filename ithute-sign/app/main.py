@@ -22,6 +22,7 @@ from document import to_pdf, sign_pdf_many, Placement, sha256
 from device import probe_bridge, show_screen, validate_signature_png
 from geometry import fit_rectangle
 from loanhub import detect_loanhub, save_loanhub_signed
+from loanhub_login_dialog import LoanHubLoginDialog
 
 def root_folder():
     if getattr(sys, "frozen", False):
@@ -242,6 +243,11 @@ class Window(QMainWindow):
         brand.setObjectName("brand")
         menu.addWidget(brand)
         menu.addWidget(QLabel("OFFLINE SIGNING WORKSPACE"))
+        login_button = QPushButton("Log in to LoanHub")
+        login_button.setObjectName("primary")
+        login_button.setMinimumHeight(42)
+        login_button.clicked.connect(self.open_loanhub_login)
+        menu.addWidget(login_button)
         menu.addSpacing(22)
         for title, actions in (
             ("DOCUMENTS", (("Open PDF / Word", self.open_document),
@@ -819,6 +825,11 @@ class Window(QMainWindow):
         actions.addWidget(open_button)
         body.addLayout(actions)
         dlg.exec()
+
+    def open_loanhub_login(self):
+        """Open existing LoanHub authentication UI; do not imply an active session."""
+        dialog = LoanHubLoginDialog(self)
+        dialog.exec()
 
     def auto_sign_loanhub(self):
         """Offline, fail-closed workflow for the verified LoanHub contract layout."""
