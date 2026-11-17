@@ -17,7 +17,7 @@ from PySide6.QtCore import Qt, QRectF
 from PySide6.QtGui import QPixmap, QImage, QPainter, QPen, QColor
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QLabel, QPushButton,
     QVBoxLayout, QHBoxLayout, QFileDialog, QMessageBox, QScrollArea, QSpinBox,
-    QDialog, QDialogButtonBox, QListWidget, QProgressBar)
+    QDialog, QDialogButtonBox, QListWidget, QProgressBar, QStackedWidget)
 from document import to_pdf, sign_pdf_many, Placement, sha256
 from device import probe_bridge, show_screen, validate_signature_png
 from geometry import fit_rectangle
@@ -288,9 +288,8 @@ class Window(QMainWindow):
         workspace = QVBoxLayout(main)
         workspace.setContentsMargins(24, 20, 24, 16)
         workspace.setSpacing(12)
-        heading = QLabel("Document workspace")
-        heading.setObjectName("pageHeading")
-        workspace.addWidget(heading)
+        self.screen_stack = QStackedWidget()
+        workspace.addWidget(self.screen_stack, 1)
         self.home_panel = QWidget()
         self.home_panel.setObjectName("homePanel")
         home = QVBoxLayout(self.home_panel)
@@ -314,7 +313,15 @@ class Window(QMainWindow):
         self.home_recent = QLabel("Recent documents this session: none")
         self.home_recent.setWordWrap(True)
         home.addWidget(self.home_recent)
-        workspace.addWidget(self.home_panel)
+        home.addStretch(1)
+        self.screen_stack.addWidget(self.home_panel)
+        self.document_panel = QWidget()
+        document_layout = QVBoxLayout(self.document_panel)
+        document_layout.setContentsMargins(0, 0, 0, 0)
+        document_layout.setSpacing(12)
+        heading = QLabel("Document workspace")
+        heading.setObjectName("pageHeading")
+        document_layout.addWidget(heading)
         navigation = QHBoxLayout()
         for label, handler in (("← Previous page", self.previous), ("Next page →", self.next)):
             button = QPushButton(label)
@@ -330,7 +337,7 @@ class Window(QMainWindow):
         fit_button = QPushButton("Fit width")
         fit_button.clicked.connect(self.fit_width)
         navigation.addWidget(fit_button)
-        workspace.addLayout(navigation)
+        document_layout.addLayout(navigation)
         options = QHBoxLayout()
         options.addWidget(QLabel("Signature width (pt)"))
         self.width = QSpinBox()
@@ -346,7 +353,7 @@ class Window(QMainWindow):
         self.height.valueChanged.connect(self.resize_selected)
         self.queue_selection_syncing = False
         options.addStretch()
-        workspace.addLayout(options)
+        document_layout.addLayout(options)
         content = QHBoxLayout()
         self.scroll = QScrollArea()
         self.page = PageView(self)
@@ -372,7 +379,9 @@ class Window(QMainWindow):
         self.signature_preview.setObjectName("signaturePreview")
         queue_panel.addWidget(self.signature_preview)
         content.addLayout(queue_panel, 1)
-        workspace.addLayout(content)
+        document_layout.addLayout(content, 1)
+        self.screen_stack.addWidget(self.document_panel)
+        self.screen_stack.setCurrentWidget(self.home_panel)
         layout.addWidget(main, 1)
         self.setStyleSheet("""
             QWidget#sidebar { background: #152941; color: white; }
@@ -555,7 +564,7 @@ class Window(QMainWindow):
                             f"{len(self.signatures)} signature(s)")
         self.refresh_document_status()
         self.refresh_workspace_progress()
-        self.home_panel.setVisible(False)
+        self.screen_stack.setCurrentWidget(self.document_panel)
     def previous(self):
         if self.doc is not None and self.page_index > 0:
             self.page_index -= 1
