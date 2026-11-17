@@ -1,10 +1,8 @@
 """Local PDF/Word conversion and image-signature placement; source is never modified."""
 from __future__ import annotations
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 import hashlib
-import json
 import os
 import fitz
 
@@ -101,11 +99,7 @@ def sign_pdf_many(source_pdf, placements, destination, source_document=None):
         raise ValueError('Output filename must end in .pdf')
     if output.exists():
         raise FileExistsError('Output already exists; choose a new filename')
-    if Path(str(output) + '.audit.json').exists():
-        raise FileExistsError('Audit output already exists')
-    audit_path = Path(str(output) + '.audit.json')
     created_pdf = False
-    created_audit = False
     try:
         with fitz.open(str(source)) as doc:
             if doc.needs_pass or len(doc) == 0:
@@ -120,28 +114,8 @@ def sign_pdf_many(source_pdf, placements, destination, source_document=None):
         with fitz.open(str(output)) as verify:
             if len(verify) == 0 or verify.needs_pass:
                 raise RuntimeError('Exported PDF could not be verified')
-        audit = {
-            'format_version': 2,
-            'created_utc': datetime.now(timezone.utc).isoformat(),
-            'source_name': original.name,
-            'source_sha256': sha256(original),
-            'source_pdf_sha256': sha256(source),
-            'signed_pdf_sha256': sha256(output),
-            'signatures': [
-                {'page_index_zero_based': p.page_index,
-                 'rect_pdf_points': [p.x, p.y, p.width, p.height],
-                 'signature_image_sha256': sha256(p.signature_png)}
-                for p in placements
-            ],
-            'method': 'visual signature images; NOT a cryptographic digital signature',
-        }
-        with audit_path.open('x', encoding='utf-8') as f:
-            created_audit = True
-            json.dump(audit, f, indent=2)
-        return str(audit_path)
+        return str(output)
     except BaseException:
-        if created_audit:
-            audit_path.unlink(missing_ok=True)
         if created_pdf:
             output.unlink(missing_ok=True)
         raise
