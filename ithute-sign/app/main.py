@@ -27,7 +27,8 @@ def root_folder():
 
 def bridge_path():
     root = root_folder()
-    for candidate in (root / "wacom-bridge" / "STUCapture.exe",
+    for candidate in (root / "wacom-bridge" / "linux" / "STUCapture",
+                      root / "wacom-bridge" / "STUCapture.exe",
                       root / "wacom-bridge" / "bin" / "STUCapture.exe"):
         if candidate.is_file():
             return candidate
