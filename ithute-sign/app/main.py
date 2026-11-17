@@ -24,6 +24,7 @@ from geometry import fit_rectangle
 from loanhub import detect_loanhub, save_loanhub_signed
 from loanhub_login_dialog import LoanHubLoginDialog
 from loanhub_company_identity import company_for_user
+from loanhub_auth import LoanHubLoginTransport
 
 def root_folder():
     if getattr(sys, "frozen", False):
@@ -891,6 +892,22 @@ class Window(QMainWindow):
         """Resolve tenant from the verified LoanHub user; never ask staff to pick."""
         self.loanhub_company = company_for_user(self.loanhub_user)
         if self.loanhub_company:
+            try:
+                company_id = self.loanhub_company["id"]
+                details = LoanHubLoginTransport("https://api.loanhub.co.ls").get_authenticated(
+                    "/api/v1/companies/" + company_id, self.loanhub_access_token)
+                if str(details.get("id")) != company_id or details.get("is_active") is False:
+                    raise ValueError("Company identity mismatch")
+                name = details.get("name")
+                if not isinstance(name, str) or not name.strip():
+                    raise ValueError("Company name missing")
+                self.loanhub_company["name"] = name.strip()
+            except Exception:
+                self.loanhub_company = None
+                self.loanhub_login_status.setText("LoanHub: Company details unavailable")
+                self.loanhub_account_note.setText(
+                    "Company membership found, but company details could not be verified.")
+                return
             self.loanhub_login_status.setText("LoanHub: " + self.loanhub_company["name"])
             self.loanhub_account_note.setText(
                 "Company identified from your LoanHub account. Client and contract access is pending.")
