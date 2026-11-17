@@ -23,7 +23,7 @@ from device import probe_bridge, show_screen, validate_signature_png
 from geometry import fit_rectangle
 from loanhub import detect_loanhub, save_loanhub_signed
 from loanhub_login_dialog import LoanHubLoginDialog
-from loanhub_company_dialog import LoanHubCompanyDialog
+from loanhub_company_identity import company_for_user
 
 def root_folder():
     if getattr(sys, "frozen", False):
@@ -261,9 +261,9 @@ class Window(QMainWindow):
         logout_button.clicked.connect(self.logout_loanhub)
         self.loanhub_logout_button = logout_button
         menu.addWidget(logout_button)
-        select_company_button = QPushButton("Select LoanHub company")
+        select_company_button = QPushButton("Company identified automatically")
         select_company_button.setObjectName("menuButton")
-        select_company_button.clicked.connect(self.select_loanhub_company)
+        select_company_button.clicked.connect(lambda: None)
         self.loanhub_select_company_button = select_company_button
         select_company_button.setEnabled(False)
         menu.addWidget(select_company_button)
@@ -875,7 +875,7 @@ class Window(QMainWindow):
         dialog = LoanHubLoginDialog(self)
         if dialog.exec() == QDialog.Accepted and dialog.access_token and dialog.verified_user:
             self.loanhub_logout_button.setEnabled(True)
-            self.loanhub_select_company_button.setEnabled(True)
+            self.loanhub_select_company_button.setEnabled(False)
             self.loanhub_access_token = dialog.access_token
             self.loanhub_user = dialog.verified_user
             self.loanhub_login_status.setText("LoanHub: Identity verified (company not selected)")
@@ -886,22 +886,20 @@ class Window(QMainWindow):
             self.loanhub_account_note.setText(
                 "LoanHub identity verified. Company membership and document access are pending.")
             self.screen_stack.setCurrentWidget(self.home_panel)
-            self.select_loanhub_company()
+            self.identify_loanhub_company()
 
-    def select_loanhub_company(self):
-        """Company access requires explicit verified active membership."""
-        if not self.loanhub_access_token or not self.loanhub_user:
-            QMessageBox.warning(self, "LoanHub", "Sign in before selecting a company.")
-            return
-        self.loanhub_company = None
-        memberships = self.loanhub_user.get("memberships", [])
-        dialog = LoanHubCompanyDialog(memberships, self)
-        if dialog.exec() == QDialog.Accepted and dialog.company:
-            self.loanhub_company = dialog.company
-            self.loanhub_login_status.setText(
-                "LoanHub: " + self.loanhub_company["name"])
+    def identify_loanhub_company(self):
+        """Resolve tenant from the verified LoanHub user; never ask staff to pick."""
+        self.loanhub_company = company_for_user(self.loanhub_user)
+        if self.loanhub_company:
+            self.loanhub_login_status.setText("LoanHub: " + self.loanhub_company["name"])
             self.loanhub_account_note.setText(
-                "Company selected. Client and contract access is not yet enabled.")
+                "Company identified from your LoanHub account. Client and contract access is pending.")
+        else:
+            self.loanhub_login_status.setText("LoanHub: Company could not be verified")
+            self.loanhub_account_note.setText(
+                "Signed in, but LoanHub did not return one unambiguous company. "
+                "Company documents remain unavailable until the account binding is verified.")
 
     def auto_sign_loanhub(self):
         """Offline, fail-closed workflow for the verified LoanHub contract layout."""
