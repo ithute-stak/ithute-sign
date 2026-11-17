@@ -8,6 +8,7 @@ import tempfile
 import subprocess
 import shutil
 import uuid
+from datetime import datetime
 from dataclasses import replace
 from pathlib import Path
 import fitz
@@ -19,6 +20,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QLabel, QPush
 from document import to_pdf, sign_pdf_many, Placement, sha256
 from device import probe_bridge, show_screen, validate_signature_png
 from geometry import fit_rectangle
+from loanhub import detect_loanhub, save_loanhub_signed
 
 def root_folder():
     if getattr(sys, "frozen", False):
@@ -233,6 +235,7 @@ class Window(QMainWindow):
         for label, handler in (("Open PDF / Word", self.open_document),
                                ("Previous", self.previous), ("Next", self.next),
                                ("Add signature", self.add_signature),
+                               ("Auto-sign LoanHub", self.auto_sign_loanhub),
                                ("Reuse selected signature", self.reuse_selected_signature),
                                ("Remove selected", self.remove_selected),
                                ("Device status", self.device_status),
@@ -360,6 +363,62 @@ class Window(QMainWindow):
             self.page_index += 1
             self.position = None
             self.redraw()
+    def auto_sign_loanhub(self):
+        """Offline, fail-closed workflow for the verified LoanHub contract layout."""
+        if self.doc is None or not self.source or Path(self.source).suffix.lower() != ".pdf":
+            QMessageBox.warning(self, "LoanHub", "Open a LoanHub PDF contract first.")
+            return
+        if self.signatures:
+            QMessageBox.warning(self, "LoanHub", "Finish or reopen the document before automatic signing.")
+            return
+        try:
+            if sha256(self.source) != self.source_digest:
+                raise ValueError("Source PDF has changed since opening")
+            pending = detect_loanhub(self.doc)
+        except Exception as exc:
+            QMessageBox.warning(self, "LoanHub template not recognized", str(exc))
+            return
+        if not pending:
+            QMessageBox.information(self, "LoanHub", "No pending witness fields found.")
+            return
+        roles = "\\n".join("• " + f.role for f in pending)
+        if QMessageBox.question(
+            self, "Confirm LoanHub signatories",
+            "The following pending roles were detected on page 7:\\n" + roles
+            + "\\n\\nConfirm the people signing are authorized for these roles."
+            + "\\nExisting SIGNED roles will not be changed.",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No) != QMessageBox.Yes:
+            return
+        captured = []
+        try:
+            self.page_index = 6
+            self.redraw()
+            for field in pending:
+                if QMessageBox.question(
+                    self, "Next signatory: " + field.role,
+                    "Ask the " + field.role + " to sign on the Wacom STU-540.\\nContinue?",
+                    QMessageBox.Yes | QMessageBox.No, QMessageBox.No) != QMessageBox.Yes:
+                    return
+                dialog = CaptureDialog(self.temp.name, self)
+                if dialog.exec() != QDialog.Accepted:
+                    return
+                target = Path(self.temp.name) / ("loanhub_" + uuid.uuid4().hex + ".png")
+                dialog.export(target)
+                validate_signature_png(target)
+                captured.append((field, str(target), datetime.now().astimezone()))
+            default = str(Path(self.source).with_name(Path(self.source).stem + "_signed.pdf"))
+            output, _ = QFileDialog.getSaveFileName(self, "Save LoanHub signed PDF", default, "PDF (*.pdf)")
+            if not output:
+                return
+            if not output.lower().endswith(".pdf"):
+                output += ".pdf"
+            if sha256(self.source) != self.source_digest:
+                raise ValueError("Source PDF changed during signing")
+            signed = save_loanhub_signed(self.source, output, captured)
+            QMessageBox.information(self, "LoanHub signed", "Signed PDF saved:\\n" + signed)
+        except Exception as exc:
+            QMessageBox.critical(self, "LoanHub signing failed", str(exc))
+
     def add_signature(self):
         if self.doc is None or self.position is None:
             QMessageBox.warning(self, "Select position", "Open a document and click where to sign.")
