@@ -13,4 +13,5 @@ mkdir -p "$BUILD"
 if [[ ! -f "$BUILD/STUCapture.class" || "$HERE/STUCapture.java" -nt "$BUILD/STUCapture.class" ]]; then
   javac -cp "$JAR" -d "$BUILD" "$HERE/STUCapture.java"
 fi
+export LD_LIBRARY_PATH="$NATIVE${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 exec java --enable-native-access=ALL-UNNAMED -Djava.library.path="$NATIVE" -cp "$BUILD:$JAR" STUCapture "$@"
