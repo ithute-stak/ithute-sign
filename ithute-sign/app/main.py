@@ -261,6 +261,12 @@ class Window(QMainWindow):
         logout_button.clicked.connect(self.logout_loanhub)
         self.loanhub_logout_button = logout_button
         menu.addWidget(logout_button)
+        select_company_button = QPushButton("Select LoanHub company")
+        select_company_button.setObjectName("menuButton")
+        select_company_button.clicked.connect(self.select_loanhub_company)
+        self.loanhub_select_company_button = select_company_button
+        select_company_button.setEnabled(False)
+        menu.addWidget(select_company_button)
         menu.addSpacing(22)
         for title, actions in (
             ("DOCUMENTS", (("Open PDF / Word", self.open_document),
@@ -853,6 +859,8 @@ class Window(QMainWindow):
         self.loanhub_login_status.setText("LoanHub: Not signed in")
         if hasattr(self, "loanhub_logout_button"):
             self.loanhub_logout_button.setEnabled(False)
+        if hasattr(self, "loanhub_select_company_button"):
+            self.loanhub_select_company_button.setEnabled(False)
         if hasattr(self, "loanhub_account_name"):
             self.loanhub_account_name.setText("LoanHub account: Not signed in")
             self.loanhub_account_note.setText(
@@ -867,6 +875,7 @@ class Window(QMainWindow):
         dialog = LoanHubLoginDialog(self)
         if dialog.exec() == QDialog.Accepted and dialog.access_token and dialog.verified_user:
             self.loanhub_logout_button.setEnabled(True)
+            self.loanhub_select_company_button.setEnabled(True)
             self.loanhub_access_token = dialog.access_token
             self.loanhub_user = dialog.verified_user
             self.loanhub_login_status.setText("LoanHub: Identity verified (company not selected)")
