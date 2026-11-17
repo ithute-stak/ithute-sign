@@ -30,7 +30,6 @@ class WhatsAppDeliveryDialog(QDialog):
         self.reference.setMaxLength(100)
         layout.addWidget(self.reference)
         self.consent = QCheckBox("I confirmed the recipient and their consent to receive this contract.")
-        self.consent.setWordWrap(True)
         layout.addWidget(self.consent)
         actions = QHBoxLayout()
         self.send = QPushButton("Send via WhatsApp")
