@@ -163,23 +163,46 @@ public final class STUCapture {
             BufferedImage picture = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
             Graphics2D g = picture.createGraphics();
             try {
+                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
                 g.setColor(Color.WHITE);
                 g.fillRect(0, 0, width, height);
-                g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g.setColor(new Color(16, 51, 82));
-                g.setFont(new Font("SansSerif", Font.BOLD, Math.max(22, width / 19)));
-                String title = "ITHUTESIGN";
+                // Scale a single vector design to the actual STU display dimensions.
+                double scale = Math.min(width / 800.0, height / 480.0);
+                g.translate((width - 800 * scale) / 2.0, (height - 480 * scale) / 2.0);
+                g.scale(scale, scale);
+                Color navy = new Color(16, 51, 82);
+                Color green = new Color(24, 125, 78);
+                g.setColor(new Color(238, 246, 250));
+                g.fillRoundRect(24, 18, 752, 444, 24, 24);
+                g.setColor(navy);
+                g.setStroke(new BasicStroke(5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                // Document-and-pen emblem; no external assets or image decoder required.
+                g.drawRoundRect(352, 42, 96, 116, 12, 12);
+                g.drawLine(370, 74, 415, 74);
+                g.drawLine(370, 91, 415, 91);
+                g.drawLine(370, 108, 402, 108);
+                g.setColor(green);
+                g.setStroke(new BasicStroke(8f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                g.drawLine(444, 51, 414, 132);
+                g.setStroke(new BasicStroke(4f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                g.drawArc(368, 115, 58, 27, 5, 155);
+                g.setColor(navy);
+                g.setFont(new Font("SansSerif", Font.BOLD, 44));
                 FontMetrics metrics = g.getFontMetrics();
-                g.drawString(title, (width - metrics.stringWidth(title)) / 2, height / 3);
-                g.setFont(new Font("SansSerif", Font.PLAIN, Math.max(15, width / 33)));
-                String line = thanks ? "Thank you for signing" : "Secure Document Signing";
+                String title = "ITHUTESIGN";
+                g.drawString(title, (800 - metrics.stringWidth(title)) / 2, 222);
+                g.setFont(new Font("SansSerif", Font.PLAIN, 22));
+                String subtitle = thanks ? "Thank you for signing" : "Secure Document Signing";
                 metrics = g.getFontMetrics();
-                g.drawString(line, (width - metrics.stringWidth(line)) / 2, height / 2);
-                String instruction = thanks ? "Signature captured" : "Ready to Sign";
-                g.setFont(new Font("SansSerif", Font.BOLD, Math.max(16, width / 30)));
+                g.drawString(subtitle, (800 - metrics.stringWidth(subtitle)) / 2, 266);
+                g.setColor(new Color(220, 239, 226));
+                g.fillRoundRect(226, 309, 348, 78, 20, 20);
+                g.setColor(green);
+                g.setFont(new Font("SansSerif", Font.BOLD, 27));
+                String statusText = thanks ? "Signature Captured" : "Ready to Sign";
                 metrics = g.getFontMetrics();
-                g.drawString(instruction, (width - metrics.stringWidth(instruction)) / 2,
-                             height * 2 / 3);
+                g.drawString(statusText, (800 - metrics.stringWidth(statusText)) / 2, 359);
             } finally {
                 g.dispose();
             }
