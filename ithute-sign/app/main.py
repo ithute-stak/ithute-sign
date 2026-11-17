@@ -250,23 +250,13 @@ class Window(QMainWindow):
         login_button = QPushButton("Log in to LoanHub")
         login_button.setObjectName("primary")
         login_button.setMinimumHeight(42)
-        login_button.clicked.connect(self.open_loanhub_login)
+        login_button.clicked.connect(self.toggle_loanhub_session)
+        self.loanhub_session_button = login_button
         menu.addWidget(login_button)
         self.loanhub_login_status = QLabel("LoanHub: Not signed in")
         self.loanhub_login_status.setWordWrap(True)
         self.loanhub_login_status.setObjectName("sidebarDetail")
         menu.addWidget(self.loanhub_login_status)
-        logout_button = QPushButton("Log out of LoanHub")
-        logout_button.setObjectName("menuButton")
-        logout_button.clicked.connect(self.logout_loanhub)
-        self.loanhub_logout_button = logout_button
-        menu.addWidget(logout_button)
-        select_company_button = QPushButton("Company identified automatically")
-        select_company_button.setObjectName("menuButton")
-        select_company_button.clicked.connect(lambda: None)
-        self.loanhub_select_company_button = select_company_button
-        select_company_button.setEnabled(False)
-        menu.addWidget(select_company_button)
         menu.addSpacing(22)
         for title, actions in (
             ("DOCUMENTS", (("Open PDF / Word", self.open_document),
@@ -857,10 +847,11 @@ class Window(QMainWindow):
         self.loanhub_user = None
         self.loanhub_company = None
         self.loanhub_login_status.setText("LoanHub: Not signed in")
-        if hasattr(self, "loanhub_logout_button"):
-            self.loanhub_logout_button.setEnabled(False)
-        if hasattr(self, "loanhub_select_company_button"):
-            self.loanhub_select_company_button.setEnabled(False)
+        if hasattr(self, "loanhub_session_button"):
+            self.loanhub_session_button.setText("Log in to LoanHub")
+            self.loanhub_session_button.setObjectName("primary")
+            self.loanhub_session_button.style().unpolish(self.loanhub_session_button)
+            self.loanhub_session_button.style().polish(self.loanhub_session_button)
         if hasattr(self, "loanhub_account_name"):
             self.loanhub_account_name.setText("LoanHub account: Not signed in")
             self.loanhub_account_note.setText(
@@ -868,14 +859,22 @@ class Window(QMainWindow):
         if hasattr(self, "screen_stack") and hasattr(self, "home_panel"):
             self.screen_stack.setCurrentWidget(self.home_panel)
 
+    def toggle_loanhub_session(self):
+        if self.loanhub_access_token:
+            self.logout_loanhub()
+        else:
+            self.open_loanhub_login()
+
     def open_loanhub_login(self):
         """Open existing LoanHub authentication UI; do not imply an active session."""
         # Reauthentication must never retain the previous employee's session.
         self.logout_loanhub()
         dialog = LoanHubLoginDialog(self)
         if dialog.exec() == QDialog.Accepted and dialog.access_token and dialog.verified_user:
-            self.loanhub_logout_button.setEnabled(True)
-            self.loanhub_select_company_button.setEnabled(False)
+            self.loanhub_session_button.setText("Log out of LoanHub")
+            self.loanhub_session_button.setObjectName("menuButton")
+            self.loanhub_session_button.style().unpolish(self.loanhub_session_button)
+            self.loanhub_session_button.style().polish(self.loanhub_session_button)
             self.loanhub_access_token = dialog.access_token
             self.loanhub_user = dialog.verified_user
             self.loanhub_login_status.setText("LoanHub: Identity verified (company not selected)")
