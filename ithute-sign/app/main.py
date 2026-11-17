@@ -259,6 +259,7 @@ class Window(QMainWindow):
         logout_button = QPushButton("Log out of LoanHub")
         logout_button.setObjectName("menuButton")
         logout_button.clicked.connect(self.logout_loanhub)
+        self.loanhub_logout_button = logout_button
         menu.addWidget(logout_button)
         menu.addSpacing(22)
         for title, actions in (
@@ -845,13 +846,19 @@ class Window(QMainWindow):
         dlg.exec()
 
     def logout_loanhub(self):
-        """Clear the desktop session; server token revocation is not implied."""
+        """Clear all LoanHub identity and company state before account switching."""
         self.loanhub_access_token = None
         self.loanhub_user = None
+        self.loanhub_company = None
         self.loanhub_login_status.setText("LoanHub: Not signed in")
+        if hasattr(self, "loanhub_logout_button"):
+            self.loanhub_logout_button.setEnabled(False)
         if hasattr(self, "loanhub_account_name"):
             self.loanhub_account_name.setText("LoanHub account: Not signed in")
-            self.loanhub_account_note.setText("Sign in to verify your employee identity. Company selection will follow.")
+            self.loanhub_account_note.setText(
+                "Signed out. Sign in with a LoanHub employee account to select a company.")
+        if hasattr(self, "screen_stack") and hasattr(self, "home_panel"):
+            self.screen_stack.setCurrentWidget(self.home_panel)
 
     def open_loanhub_login(self):
         """Open existing LoanHub authentication UI; do not imply an active session."""
@@ -859,6 +866,7 @@ class Window(QMainWindow):
         self.logout_loanhub()
         dialog = LoanHubLoginDialog(self)
         if dialog.exec() == QDialog.Accepted and dialog.access_token and dialog.verified_user:
+            self.loanhub_logout_button.setEnabled(True)
             self.loanhub_access_token = dialog.access_token
             self.loanhub_user = dialog.verified_user
             self.loanhub_login_status.setText("LoanHub: Identity verified (company not selected)")
