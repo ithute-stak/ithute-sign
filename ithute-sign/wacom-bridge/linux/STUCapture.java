@@ -98,9 +98,38 @@ public final class STUCapture {
                     }
                     accepted = true; dialog.dispose();
                 });
-                JPanel actions = new JPanel();
+                Color navy = new Color(16, 51, 82);
+                Color green = new Color(24, 125, 78);
+                JPanel header = new JPanel(new BorderLayout(8, 6));
+                header.setBackground(navy);
+                header.setBorder(BorderFactory.createEmptyBorder(14, 18, 14, 18));
+                JLabel brand = new JLabel("ITHUTESIGN  |  Secure Document Signing");
+                brand.setFont(new Font("SansSerif", Font.BOLD, 20));
+                brand.setForeground(Color.WHITE);
+                JLabel instructions = new JLabel("Sign on the Wacom STU-540. Review your signature before accepting.");
+                instructions.setFont(new Font("SansSerif", Font.PLAIN, 13));
+                instructions.setForeground(new Color(225, 239, 246));
+                header.add(brand, BorderLayout.NORTH);
+                header.add(instructions, BorderLayout.SOUTH);
+                canvas.setBorder(BorderFactory.createLineBorder(new Color(204, 220, 231), 2));
+                JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 12, 12));
+                actions.setBackground(new Color(238, 246, 250));
+                clearButton.setToolTipText("Erase the current signature and start again");
+                cancelButton.setToolTipText("Close without saving a signature");
+                acceptButton.setToolTipText("Save the captured signature");
+                acceptButton.setBackground(green);
+                acceptButton.setForeground(Color.WHITE);
+                acceptButton.setFont(new Font("SansSerif", Font.BOLD, 14));
+                acceptButton.setOpaque(true);
+                clearButton.setFocusable(false);
+                cancelButton.setFocusable(false);
+                acceptButton.setFocusable(false);
                 actions.add(clearButton); actions.add(cancelButton); actions.add(acceptButton);
-                dialog.add(new JLabel("Sign on the Wacom STU-540, then accept below."), BorderLayout.NORTH);
+                dialog.getRootPane().setDefaultButton(acceptButton);
+                dialog.getRootPane().registerKeyboardAction(e -> { cancelled = true; dialog.dispose(); },
+                    KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0),
+                    JComponent.WHEN_IN_FOCUSED_WINDOW);
+                dialog.add(header, BorderLayout.NORTH);
                 dialog.add(canvas, BorderLayout.CENTER);
                 dialog.add(actions, BorderLayout.SOUTH);
                 dialog.pack(); dialog.setLocationRelativeTo(null);
