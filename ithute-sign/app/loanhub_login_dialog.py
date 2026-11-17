@@ -1,11 +1,11 @@
 """LoanHub login dialog for IthuteSign (no LoanHub backend modifications).
 
 Login response is not treated as an authenticated session until the existing
-LoanHub auth schema and MFA/company-selection handshake are verified.
+LoanHub auth schema and company-membership handshake are verified.
 """
 from __future__ import annotations
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QFormLayout, QLineEdit,
-                               QPushButton, QLabel, QMessageBox)
+                               QPushButton, QLabel)
 from loanhub_auth import LoanHubLoginTransport
 
 class LoanHubLoginDialog(QDialog):
@@ -23,13 +23,9 @@ class LoanHubLoginDialog(QDialog):
         self.phone.setPlaceholderText("LoanHub account phone number")
         self.password = QLineEdit()
         self.password.setEchoMode(QLineEdit.Password)
-        self.otp = QLineEdit()
-        self.otp.setPlaceholderText("Only if required by LoanHub")
-        self.otp.setVisible(False)
         form.addRow("API server", self.origin)
         form.addRow("Phone", self.phone)
         form.addRow("Password", self.password)
-        form.addRow("Verification code", self.otp)
         layout.addLayout(form)
         self.status = QLabel("Online login requires an internet connection.")
         self.status.setWordWrap(True)
@@ -50,21 +46,13 @@ class LoanHubLoginDialog(QDialog):
         self.submit.setEnabled(False)
         try:
             payload = {"phone": phone, "password": password}
-            # Do not guess the backend MFA payload field; handle challenge
-            # once the deployed contract has been inspected.
-            if self.otp.isVisible():
-                self.status.setText("MFA challenge response requires verified API schema.")
-                return
             response = LoanHubLoginTransport(self.origin.text()).post("/api/v1/auth/login", payload)
             # Do not display raw server response or tokens in UI/logs.
             if any(k in response for k in ("mfa_required", "requires_mfa", "otp_required")):
-                self.otp.setVisible(True)
-                self.status.setText("LoanHub requires verification. MFA completion is not yet connected.")
+                self.status.setText("This LoanHub account requires additional verification. Use LoanHub to complete it.")
                 return
             self.response = response
             self.status.setText("Login response received. Session and company membership validation are pending.")
-            QMessageBox.information(self, "LoanHub response",
-                "LoanHub responded, but authentication is not complete until the session and company membership are verified.")
         except Exception as exc:
             self.status.setText(str(exc))
         finally:
