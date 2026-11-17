@@ -110,9 +110,25 @@ public final class STUCapture {
                 dialog.setVisible(true);
             });
             if (!accepted || cancelled) throw new IllegalStateException("Signature capture cancelled");
-            BufferedImage img = new BufferedImage(W, H, BufferedImage.TYPE_INT_ARGB);
+            // Export only the actual ink, not the tablet's full 800x480 canvas.
+            // Preserve stroke aspect ratio and a small transparent safety margin.
+            double minX = W, minY = H, maxX = 0, maxY = 0;
+            synchronized (this) {
+                for (var stroke : strokes) for (var point : stroke) {
+                    minX = Math.min(minX, point.x); minY = Math.min(minY, point.y);
+                    maxX = Math.max(maxX, point.x); maxY = Math.max(maxY, point.y);
+                }
+            }
+            if (points() < 3) throw new IllegalStateException("Signature contains insufficient ink");
+            int padding = 12;
+            int left = Math.max(0, (int)Math.floor(minX) - padding);
+            int top = Math.max(0, (int)Math.floor(minY) - padding);
+            int right = Math.min(W, (int)Math.ceil(maxX) + padding + 1);
+            int bottom = Math.min(H, (int)Math.ceil(maxY) + padding + 1);
+            BufferedImage img = new BufferedImage(right - left, bottom - top, BufferedImage.TYPE_INT_ARGB);
             Graphics2D g = img.createGraphics();
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g.translate(-left, -top);
             synchronized (this) { render(g); }
             g.dispose();
             Path parent = output.toAbsolutePath().getParent();
