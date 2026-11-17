@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
     QLineEdit, QPushButton, QMessageBox, QCheckBox)
-from whatsapp_delivery import submit_signed_contract, normalise_whatsapp_number
+from whatsapp_delivery import submit_signed_contract, normalise_whatsapp_number, fetch_delivery_status
 
 
 class WhatsAppDeliveryDialog(QDialog):
@@ -14,6 +14,7 @@ class WhatsAppDeliveryDialog(QDialog):
         self.token = token
         self.company = company
         self.pdf_path = str(pdf_path)
+        self.delivery_id = None
         layout = QVBoxLayout(self)
         layout.setSpacing(13)
         title = QLabel("Send signed contract")
@@ -35,6 +36,10 @@ class WhatsAppDeliveryDialog(QDialog):
         self.send = QPushButton("Send via WhatsApp")
         self.send.clicked.connect(self.submit)
         actions.addWidget(self.send)
+        self.check = QPushButton("Check delivery status")
+        self.check.setEnabled(False)
+        self.check.clicked.connect(self.check_status)
+        actions.addWidget(self.check)
         cancel = QPushButton("Cancel")
         cancel.clicked.connect(self.reject)
         actions.addWidget(cancel)
@@ -54,11 +59,24 @@ class WhatsAppDeliveryDialog(QDialog):
             self.send.setEnabled(False)
             result = submit_signed_contract(origin, self.token, self.company["id"],
                                             number, self.pdf_path, reference)
+            self.delivery_id = str(result["delivery_id"])
+            self.check.setEnabled(True)
+            self.send.setEnabled(False)
             QMessageBox.information(self, "WhatsApp",
-                "Submitted to WhatsApp. This does not yet confirm delivery.\\n"
-                "Delivery ID: " + str(result["delivery_id"]))
-            self.accept()
+                "Accepted for processing. This does not confirm delivery.\\n"
+                "Delivery ID: " + self.delivery_id)
         except (ValueError, ConnectionError) as exc:
             QMessageBox.warning(self, "WhatsApp", str(exc))
         finally:
-            self.send.setEnabled(True)
+            if self.delivery_id is None:
+                self.send.setEnabled(True)
+
+    def check_status(self):
+        if not self.delivery_id:
+            return
+        try:
+            origin = os.environ.get("ITHUTESIGN_DELIVERY_URL", "")
+            status = fetch_delivery_status(origin, self.token, self.delivery_id)
+            QMessageBox.information(self, "WhatsApp delivery", "Current status: " + status)
+        except (ValueError, ConnectionError) as exc:
+            QMessageBox.warning(self, "WhatsApp delivery", str(exc))
