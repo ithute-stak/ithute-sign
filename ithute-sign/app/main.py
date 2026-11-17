@@ -16,7 +16,7 @@ from PySide6.QtCore import Qt, QRectF
 from PySide6.QtGui import QPixmap, QImage, QPainter, QPen, QColor
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QLabel, QPushButton,
     QVBoxLayout, QHBoxLayout, QFileDialog, QMessageBox, QScrollArea, QSpinBox,
-    QDialog, QDialogButtonBox, QListWidget)
+    QDialog, QDialogButtonBox, QListWidget, QProgressBar)
 from document import to_pdf, sign_pdf_many, Placement, sha256
 from device import probe_bridge, show_screen, validate_signature_png
 from geometry import fit_rectangle
@@ -442,6 +442,45 @@ class Window(QMainWindow):
             self.page_index += 1
             self.position = None
             self.redraw()
+    def show_loanhub_progress(self, pending, completed=()):
+        """Guided signing overview; no signature dragging or online dependency."""
+        dlg = QDialog(self)
+        dlg.setWindowTitle("IthuteSign — LoanHub signing")
+        dlg.setMinimumWidth(520)
+        dlg.setStyleSheet("""
+            QDialog { background: #f5f8fc; color: #18304c; }
+            QLabel { color: #18304c; font-size: 13px; }
+            QLabel#heading { font-size: 20px; font-weight: 750; }
+            QListWidget { background: white; color: #18304c; border: 1px solid #cbd8e6;
+                border-radius: 9px; padding: 8px; font-size: 13px; }
+            QProgressBar { background: #e2eaf2; border: none; border-radius: 7px;
+                height: 14px; text-align: center; color: #18304c; }
+            QProgressBar::chunk { background: #087e82; border-radius: 7px; }
+            QPushButton { padding: 10px 18px; border-radius: 7px;
+                background: #087e82; color: white; font-weight: 700; }
+        """)
+        body = QVBoxLayout(dlg)
+        body.setContentsMargins(26, 24, 26, 24)
+        heading = QLabel("LoanHub signature checklist")
+        heading.setObjectName("heading")
+        body.addWidget(heading)
+        body.addWidget(QLabel("Page 7 · Annexure C · Offline signing"))
+        checklist = QListWidget()
+        completed_roles = set(completed)
+        for field in pending:
+            checklist.addItem(("✓  Signed  —  " if field.role in completed_roles
+                               else "○  Awaiting signature  —  ") + field.role)
+        checklist.setMinimumHeight(min(260, 52 * len(pending) + 20))
+        body.addWidget(checklist)
+        progress = QProgressBar()
+        progress.setRange(0, len(pending))
+        progress.setValue(len(completed_roles))
+        body.addWidget(progress)
+        button = QPushButton("Continue" if len(completed_roles) < len(pending) else "Review complete")
+        button.clicked.connect(dlg.accept)
+        body.addWidget(button)
+        dlg.exec()
+
     def confirm_signer(self, title, description, confirm_text="Continue"):
         """Consistent, accessible offline signing confirmation dialog."""
         popup = QDialog(self)
@@ -511,6 +550,7 @@ class Window(QMainWindow):
             return
         captured = []
         try:
+            self.show_loanhub_progress(pending)
             self.page_index = 6
             self.redraw()
             for field in pending:
@@ -528,6 +568,7 @@ class Window(QMainWindow):
                 dialog.export(target)
                 validate_signature_png(target)
                 captured.append((field, str(target), datetime.now().astimezone()))
+                self.show_loanhub_progress(pending, [entry[0].role for entry in captured])
             default = str(Path(self.source).with_name(Path(self.source).stem + "_signed.pdf"))
             output, _ = QFileDialog.getSaveFileName(self, "Save LoanHub signed PDF", default, "PDF (*.pdf)")
             if not output:
