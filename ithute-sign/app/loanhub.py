@@ -114,9 +114,39 @@ def save_loanhub_signed(source, destination, captured):
         with destination.open("xb") as out:
             out.write(pdf.tobytes(garbage=4, deflate=True))
     try:
-        with fitz.open(destination) as verify:
-            if len(verify) != 8 or "SIGNED" not in verify[6].get_text():
-                raise ValueError("Saved PDF failed verification")
+        with fitz.open(source) as original, fitz.open(destination) as verified:
+            if len(verified) != len(original) or len(verified) != 8:
+                raise ValueError("Signed PDF page count changed")
+            if any(verified[i].get_text() != original[i].get_text()
+                   for i in range(len(original)) if i != 6):
+                raise ValueError("Non-signature page text changed")
+            original_page = original[6]
+            signed_page = verified[6]
+            # Only validate the newly captured fields. Pre-existing signed
+            # records are not proof of a handwritten signature.
+            for field, png, accepted in captured:
+                rect = fitz.Rect(*field.box)
+                images = [block for block in signed_page.get_text("dict")["blocks"]
+                          if block.get("type") == 1
+                          and fitz.Rect(block["bbox"]).intersects(rect)]
+                original_images = [block for block in original_page.get_text("dict")["blocks"]
+                                   if block.get("type") == 1
+                                   and fitz.Rect(block["bbox"]).intersects(rect)]
+                if len(images) <= len(original_images):
+                    raise ValueError("Signature image missing: " + field.role)
+                if field.status is not None:
+                    if "SIGNED" not in signed_page.get_textbox(field.status):
+                        raise ValueError("SIGNED status missing: " + field.role)
+                    if "Pending" in signed_page.get_textbox(field.date):
+                        raise ValueError("Pending date not replaced: " + field.role)
+                    if "Wacom STU-540" not in signed_page.get_textbox(field.method):
+                        raise ValueError("Capture method missing: " + field.role)
+                else:
+                    stamp = fitz.Rect(field.box[0], 534.2, field.box[2], 541.8)
+                    if not signed_page.get_textbox(stamp).strip():
+                        raise ValueError("Execution timestamp missing: " + field.role)
+            if not destination.stat().st_size:
+                raise ValueError("Signed PDF is empty")
     except BaseException:
         destination.unlink(missing_ok=True)
         raise
