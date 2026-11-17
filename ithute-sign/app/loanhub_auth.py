@@ -32,7 +32,7 @@ class LoanHubLoginTransport:
                                     _NoRedirect())
 
     def post(self, endpoint: str, payload: dict) -> dict:
-        if not endpoint.startswith("/") or endpoint.startswith("//") or "?" in endpoint or "#" in endpoint:
+        if not endpoint.startswith("/") or endpoint.startswith("//") or "#" in endpoint or "\\r" in endpoint or "\\n" in endpoint:
             raise ValueError("Invalid authentication endpoint")
         body = json.dumps(payload).encode("utf-8")
         request = Request(self.origin + endpoint, data=body, method="POST",
@@ -55,16 +55,27 @@ class LoanHubLoginTransport:
         except URLError:
             raise ConnectionError("Cannot reach the LoanHub server securely") from None
 
-    def get_authenticated(self, endpoint: str, access_token: str) -> dict:
+    def get_authenticated(self, endpoint: str, access_token: str, headers=None):
         """Verify session against LoanHub; never trust a login response alone."""
         if not endpoint.startswith("/") or endpoint.startswith("//") or "?" in endpoint or "#" in endpoint:
             raise ValueError("Invalid LoanHub endpoint")
         if not isinstance(access_token, str) or not access_token or any(c.isspace() for c in access_token):
             raise ValueError("Invalid LoanHub access token")
-        request = Request(self.origin + endpoint, method="GET",
-                          headers={"Accept": "application/json",
-                                   "Authorization": "Bearer " + access_token,
-                                   "Cache-Control": "no-store"})
+        request_headers = {"Accept": "application/json",
+                           "Authorization": "Bearer " + access_token,
+                           "Cache-Control": "no-store"}
+        if headers:
+            if not isinstance(headers, dict) or set(headers) - {"X-Company-ID", "X-Active-Role"}:
+                raise ValueError("Unsupported LoanHub request headers")
+            from uuid import UUID
+            if "X-Company-ID" in headers:
+                request_headers["X-Company-ID"] = str(UUID(str(headers["X-Company-ID"])))
+            if "X-Active-Role" in headers:
+                role = str(headers["X-Active-Role"])
+                if not role or not role.replace("_", "").isalnum():
+                    raise ValueError("Invalid LoanHub role")
+                request_headers["X-Active-Role"] = role
+        request = Request(self.origin + endpoint, method="GET", headers=request_headers)
         try:
             with self._opener.open(request, timeout=15) as response:
                 if response.status != 200:
@@ -73,8 +84,8 @@ class LoanHubLoginTransport:
                 if len(raw) > MAX_RESPONSE:
                     raise ValueError("LoanHub response exceeds size limit")
                 data = json.loads(raw)
-                if not isinstance(data, dict):
-                    raise ValueError("Invalid LoanHub session response")
+                if not isinstance(data, (dict, list)):
+                    raise ValueError("Invalid LoanHub response")
                 return data
         except HTTPError as exc:
             raise ValueError("LoanHub session verification failed (HTTP %d)" % exc.code) from None
