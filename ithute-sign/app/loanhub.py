@@ -13,9 +13,9 @@ class PendingField:
     role: str
     page: int
     box: tuple
-    status: fitz.Rect
-    date: fitz.Rect
-    method: fitz.Rect
+    status: fitz.Rect | None
+    date: fitz.Rect | None
+    method: fitz.Rect | None
 
 def detect_loanhub(pdf):
     if len(pdf) != 8:
@@ -45,6 +45,30 @@ def detect_loanhub(pdf):
         if status_text != "PENDING" or date_text != "Pending":
             raise ValueError("Unexpected status for " + role + "; review the PDF manually")
         found.append(PendingField(role, 6, box, status, date, method))
+    # The two separate execution boxes must be signed even when the top
+    # borrower and lender records are already marked SIGNED.
+    bottom_specs = (
+        ("Borrower execution", "PLACE OF BORROWER SIGNATURE", (57.6, 516.0, 239.0, 533.8),
+         fitz.Rect(56, 518, 240, 535)),
+        ("Lender execution", "PLACE OF LENDER SIGNATURE", (311.3, 516.0, 493.0, 533.8),
+         fitz.Rect(310, 518, 494, 535)),
+    )
+    for role, anchor, box, underline_rect in bottom_specs:
+        if len(page.search_for(anchor)) != 1:
+            raise ValueError("Missing or duplicated LoanHub execution field: " + role)
+        underline = page.get_textbox(underline_rect).strip()
+        if underline == "________________________________":
+            found.append(PendingField(role, 6, box, None, None, None))
+        elif underline:
+            raise ValueError("Unexpected content in " + role + "; manual review required")
+        else:
+            # A previously signed execution field has no placeholder line.
+            # Verify it contains an image within the field; otherwise fail closed.
+            region = fitz.Rect(*box)
+            images = [b for b in page.get_text("dict")["blocks"]
+                      if b.get("type") == 1 and fitz.Rect(b["bbox"]).intersects(region)]
+            if not images:
+                raise ValueError("Missing signature and placeholder for " + role)
     return found
 
 def _replace_text(page, rect, value, fontsize=8, color=(0.09, 0.22, 0.35)):
@@ -77,9 +101,15 @@ def save_loanhub_signed(source, destination, captured):
         page.apply_redactions(images=0, graphics=0, text=0)
         for field, png, accepted in captured:
             page.insert_image(fitz.Rect(*field.box), filename=str(png), keep_proportion=True, overlay=True)
-            _replace_text(page, field.status, "SIGNED", fontsize=7)
-            _replace_text(page, field.date, accepted.strftime("%d %b %Y %H:%M %Z"), fontsize=6)
-            _replace_text(page, field.method, "Wacom STU-540", fontsize=7)
+            if field.status is not None:
+                _replace_text(page, field.status, "SIGNED", fontsize=7)
+                _replace_text(page, field.date, accepted.strftime("%d %b %Y %H:%M %Z"), fontsize=6)
+                _replace_text(page, field.method, "Wacom STU-540", fontsize=7)
+            else:
+                # Small timestamp stays inside the execution box, below the ink.
+                stamp = fitz.Rect(field.box[0], 534.2, field.box[2], 541.8)
+                page.insert_textbox(stamp, accepted.strftime("%d %b %Y %H:%M %Z"),
+                                    fontsize=5.5, fontname="helv", color=(0.09, 0.22, 0.35))
         # Exclusive creation prevents accidental overwrite.
         with destination.open("xb") as out:
             out.write(pdf.tobytes(garbage=4, deflate=True))
