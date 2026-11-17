@@ -227,25 +227,59 @@ class Window(QMainWindow):
         self.signatures = []
         base = QWidget()
         self.setCentralWidget(base)
-        layout = QVBoxLayout(base)
-        heading = QLabel("ITHUTESIGN  |  Offline document signing")
-        heading.setStyleSheet("font-size:19px;font-weight:700;color:#18355b;padding:10px")
-        layout.addWidget(heading)
-        controls = QHBoxLayout()
-        for label, handler in (("Open PDF / Word", self.open_document),
-                               ("Previous", self.previous), ("Next", self.next),
-                               ("Add signature", self.add_signature),
-                               ("Auto-sign LoanHub", self.auto_sign_loanhub),
-                               ("Reuse selected signature", self.reuse_selected_signature),
-                               ("Remove selected", self.remove_selected),
-                               ("Device status", self.device_status),
-                               ("Save signed PDF", self.save)):
-            btn = QPushButton(label)
-            btn.clicked.connect(handler)
-            controls.addWidget(btn)
-        layout.addLayout(controls)
+        layout = QHBoxLayout(base)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        sidebar = QWidget()
+        sidebar.setObjectName("sidebar")
+        sidebar.setFixedWidth(248)
+        menu = QVBoxLayout(sidebar)
+        menu.setContentsMargins(16, 22, 16, 18)
+        menu.setSpacing(9)
+        brand = QLabel("ITHUTESIGN")
+        brand.setObjectName("brand")
+        menu.addWidget(brand)
+        menu.addWidget(QLabel("OFFLINE SIGNING WORKSPACE"))
+        menu.addSpacing(22)
+        for title, actions in (
+            ("DOCUMENTS", (("Open PDF / Word", self.open_document),
+                           ("Auto-sign LoanHub", self.auto_sign_loanhub))),
+            ("SIGNATURES", (("Add signature", self.add_signature),
+                            ("Reuse selected signature", self.reuse_selected_signature),
+                            ("Remove selected", self.remove_selected))),
+            ("DEVICE & EXPORT", (("Device status", self.device_status),
+                                 ("Save signed PDF", self.save)))):
+            section = QLabel(title)
+            section.setObjectName("section")
+            menu.addWidget(section)
+            for label, handler in actions:
+                button = QPushButton(label)
+                button.setObjectName("primary" if label in ("Auto-sign LoanHub", "Save signed PDF") else "menuButton")
+                button.setMinimumHeight(42)
+                button.setCursor(Qt.PointingHandCursor)
+                button.clicked.connect(handler)
+                menu.addWidget(button)
+            menu.addSpacing(14)
+        menu.addStretch()
+        menu.addWidget(QLabel("LOCAL MODE  •  NO INTERNET REQUIRED"))
+        layout.addWidget(sidebar)
+        main = QWidget()
+        main.setObjectName("mainArea")
+        workspace = QVBoxLayout(main)
+        workspace.setContentsMargins(24, 20, 24, 16)
+        workspace.setSpacing(12)
+        heading = QLabel("Document workspace")
+        heading.setObjectName("pageHeading")
+        workspace.addWidget(heading)
+        navigation = QHBoxLayout()
+        for label, handler in (("← Previous page", self.previous), ("Next page →", self.next)):
+            button = QPushButton(label)
+            button.clicked.connect(handler)
+            navigation.addWidget(button)
+        navigation.addStretch()
+        workspace.addLayout(navigation)
         options = QHBoxLayout()
-        options.addWidget(QLabel("Width (pt)"))
+        options.addWidget(QLabel("Signature width (pt)"))
         self.width = QSpinBox()
         self.width.setRange(30, 400)
         self.width.setValue(160)
@@ -259,21 +293,41 @@ class Window(QMainWindow):
         self.height.valueChanged.connect(self.resize_selected)
         self.queue_selection_syncing = False
         options.addStretch()
-        layout.addLayout(options)
+        workspace.addLayout(options)
         content = QHBoxLayout()
         self.scroll = QScrollArea()
         self.page = PageView(self)
         self.scroll.setWidget(self.page)
         content.addWidget(self.scroll, 4)
-        side = QVBoxLayout()
-        side.addWidget(QLabel("Queued signatures"))
+        queue_panel = QVBoxLayout()
+        queue_panel.addWidget(QLabel("Signature placements"))
         self.queue = QListWidget()
         self.queue.currentRowChanged.connect(self.select_signature)
-        side.addWidget(self.queue)
-        content.addLayout(side, 1)
-        layout.addLayout(content)
+        queue_panel.addWidget(self.queue)
+        content.addLayout(queue_panel, 1)
+        workspace.addLayout(content)
+        layout.addWidget(main, 1)
+        self.setStyleSheet("""
+            QWidget#sidebar { background: #152941; color: white; }
+            QWidget#sidebar QLabel { color: #b7c8db; font-weight: 600; }
+            QLabel#brand { color: white; font-size: 23px; font-weight: 800; }
+            QLabel#section { color: #8faac4; font-size: 11px; }
+            QPushButton#menuButton, QPushButton#primary {
+                text-align: left; padding: 9px 13px; border: none;
+                border-radius: 8px; background: #203954; color: white;
+                font-weight: 600;
+            }
+            QPushButton#menuButton:hover { background: #315473; }
+            QPushButton#primary { background: #087e82; }
+            QPushButton#primary:hover { background: #0b999c; }
+            QWidget#mainArea { background: #eef2f7; color: #18304c; }
+            QLabel#pageHeading { color: #18304c; font-size: 22px; font-weight: 750; }
+            QWidget#mainArea QPushButton { padding: 8px 13px; }
+            QWidget#mainArea QListWidget { background: white; border: 1px solid #d1dce8; border-radius: 8px; }
+            QWidget#mainArea QScrollArea { border: 1px solid #d1dce8; background: #dce4ed; }
+        """)
         self.status = QLabel("Connect STU-540. Open a document to begin.")
-        layout.addWidget(self.status)
+        workspace.addWidget(self.status)
         from PySide6.QtCore import QTimer
         QTimer.singleShot(300, self.welcome)
     def welcome(self):
