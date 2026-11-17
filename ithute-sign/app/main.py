@@ -317,6 +317,12 @@ class Window(QMainWindow):
                        "Choose a document to begin; no internet connection is required.")
         intro.setWordWrap(True)
         home.addWidget(intro)
+        self.loanhub_account_name = QLabel("LoanHub account: Not signed in")
+        self.loanhub_account_name.setObjectName("pageHeading")
+        home.addWidget(self.loanhub_account_name)
+        self.loanhub_account_note = QLabel("Sign in to verify your employee identity. Company selection will follow.")
+        self.loanhub_account_note.setWordWrap(True)
+        home.addWidget(self.loanhub_account_note)
         shortcuts = QHBoxLayout()
         for label, handler in (("Open PDF / Word", self.open_document),
                                ("Auto-sign LoanHub", self.open_loanhub_from_home),
@@ -841,6 +847,9 @@ class Window(QMainWindow):
         self.loanhub_access_token = None
         self.loanhub_user = None
         self.loanhub_login_status.setText("LoanHub: Not signed in")
+        if hasattr(self, "loanhub_account_name"):
+            self.loanhub_account_name.setText("LoanHub account: Not signed in")
+            self.loanhub_account_note.setText("Sign in to verify your employee identity. Company selection will follow.")
 
     def open_loanhub_login(self):
         """Open existing LoanHub authentication UI; do not imply an active session."""
@@ -851,6 +860,13 @@ class Window(QMainWindow):
             self.loanhub_access_token = dialog.access_token
             self.loanhub_user = dialog.verified_user
             self.loanhub_login_status.setText("LoanHub: Identity verified (company not selected)")
+            display = (self.loanhub_user.get("full_name")
+                       or self.loanhub_user.get("name")
+                       or self.loanhub_user.get("phone") or "Employee")
+            self.loanhub_account_name.setText("Welcome, " + str(display))
+            self.loanhub_account_note.setText(
+                "LoanHub identity verified. Company membership and document access are pending.")
+            self.screen_stack.setCurrentWidget(self.home_panel)
 
     def auto_sign_loanhub(self):
         """Offline, fail-closed workflow for the verified LoanHub contract layout."""
