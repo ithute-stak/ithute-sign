@@ -108,17 +108,17 @@
                             <Button Content="Check recovery readiness" Click="CheckOfflineRecoveryReadiness_Click" HorizontalAlignment="Left" />
                         </StackPanel>
                     </Border>
-                    <!-- Legacy arbitrary-file workflow is not part of LoanHub signing. -->
-                    <StackPanel Visibility="Collapsed">
+                    <!-- Independent local PDF signing workspace: does not update LoanHub contract status. -->
+                    <StackPanel Visibility="Visible">
                     <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                             BorderThickness="1" CornerRadius="16" Padding="28">
                         <StackPanel Spacing="14">
-                            <TextBlock Text="Ready to sign a document?" FontSize="22" FontWeight="SemiBold" />
-                            <TextBlock Text="Choose a PDF or Word document. The selected document opens directly in the tested signing application." TextWrapping="Wrap" Opacity="0.8" />
+                            <TextBlock Text="Open a local PDF for Wacom signing" FontSize="22" FontWeight="SemiBold" />
+                            <TextBlock Text="Choose a local PDF and open it in the classic IthuteSign signer. Save a separate signed copy there. This does not update LoanHub." TextWrapping="Wrap" Opacity="0.8" />
                             <StackPanel Orientation="Horizontal" Spacing="12">
-                                <Button Content="Choose document" Click="ChooseDocument_Click" />
-                                <Button Content="Launch signing app" Click="LaunchLegacy_Click" />
+                                <Button Content="Choose PDF contract" Click="ChooseDocument_Click" />
+                                <Button Content="Open PDF in signing app" Click="LaunchLegacy_Click" />
                             </StackPanel>
                             <TextBlock x:Name="SelectedDocument" Text="No document selected" TextWrapping="Wrap" Opacity="0.7" />
                             <TextBlock x:Name="DocumentDetails" Text="Select a local document to view its details." TextWrapping="Wrap" Opacity="0.6" FontSize="12" />
