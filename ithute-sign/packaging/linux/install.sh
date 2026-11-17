@@ -9,7 +9,7 @@ ICONS="${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor/scalable/apps"
 BIN="$HOME/.local/bin"
 DESKTOP="$APPLICATIONS/ithutesign.desktop"
 if [[ "${1:-}" == "--uninstall" ]]; then
-  rm -f "$DESKTOP" "$BIN/ithutesign" "$ICONS/ithutesign.svg"
+  rm -f "$DESKTOP" "$BIN/ithutesign" "$ICONS/ithutesign.svg" "$HOME/Desktop/ithutesign.desktop"
   rm -rf -- "$PREFIX"
   echo "IthuteSign application removed (documents outside installation unchanged)."
   exit 0
@@ -55,6 +55,14 @@ Categories=Office;Utility;
 StartupNotify=true
 EOF
 chmod 644 "$DESKTOP"
+# Trust only the desktop shortcut installed by this script.
+if [[ -d "$HOME/Desktop" ]]; then
+  cp -- "$DESKTOP" "$HOME/Desktop/ithutesign.desktop"
+  chmod +x "$HOME/Desktop/ithutesign.desktop"
+  if command -v gio >/dev/null 2>&1; then
+    gio set "$HOME/Desktop/ithutesign.desktop" metadata::trusted true || true
+  fi
+fi
 if command -v update-desktop-database >/dev/null 2>&1; then update-desktop-database "$APPLICATIONS" || true; fi
 echo "IthuteSign installed. Find it in your application launcher as IthuteSign."
 echo "Desktop shortcut: cp '$DESKTOP' '$HOME/Desktop/ithutesign.desktop' (if desired)."
