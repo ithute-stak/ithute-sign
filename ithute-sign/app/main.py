@@ -357,6 +357,20 @@ class Window(QMainWindow):
         self.queue = QListWidget()
         self.queue.currentRowChanged.connect(self.select_signature)
         queue_panel.addWidget(self.queue)
+        queue_panel.addWidget(QLabel("Signing progress"))
+        self.workspace_progress = QProgressBar()
+        self.workspace_progress.setRange(0, 1)
+        self.workspace_progress.setValue(0)
+        queue_panel.addWidget(self.workspace_progress)
+        self.workspace_hint = QLabel("Open a document to begin")
+        self.workspace_hint.setWordWrap(True)
+        self.workspace_hint.setObjectName("workspaceHint")
+        queue_panel.addWidget(self.workspace_hint)
+        self.signature_preview = QLabel("Select a signature to preview")
+        self.signature_preview.setAlignment(Qt.AlignCenter)
+        self.signature_preview.setMinimumHeight(95)
+        self.signature_preview.setObjectName("signaturePreview")
+        queue_panel.addWidget(self.signature_preview)
         content.addLayout(queue_panel, 1)
         workspace.addLayout(content)
         layout.addWidget(main, 1)
@@ -382,6 +396,10 @@ class Window(QMainWindow):
             QWidget#mainArea QSpinBox { background: white; color: #18304c;
                 border: 1px solid #bdcbd9; border-radius: 5px; padding: 5px; }
             QWidget#mainArea QListWidget { background: white; border: 1px solid #d1dce8; border-radius: 8px; }
+            QLabel#workspaceHint { color: #52677f; font-size: 12px; }
+            QLabel#signaturePreview { background: white; border: 1px dashed #bdcbd9; border-radius: 8px; }
+            QWidget#mainArea QProgressBar { background: #dce4ed; border-radius: 6px; text-align: center; }
+            QWidget#mainArea QProgressBar::chunk { background: #087e82; border-radius: 6px; }
             QWidget#mainArea QScrollArea { border: 1px solid #d1dce8; background: #dce4ed; }
         """)
         self.status = QLabel("Connect STU-540. Open a document to begin.")
@@ -389,6 +407,32 @@ class Window(QMainWindow):
         workspace.addWidget(self.status)
         from PySide6.QtCore import QTimer
         QTimer.singleShot(300, self.welcome)
+    def refresh_workspace_progress(self):
+        if self.doc is None:
+            self.workspace_progress.setRange(0, 1)
+            self.workspace_progress.setValue(0)
+            self.workspace_hint.setText("Open a document to begin")
+        else:
+            count = len(self.signatures)
+            # Manual signing has no known required-field total; never
+            # misrepresent a placement count as contract completion.
+            self.workspace_progress.setRange(0, max(1, count))
+            self.workspace_progress.setValue(count)
+            self.workspace_hint.setText(
+                f"{count} manual placement(s) queued. "
+                "Review the PDF and save when all required signers have signed."
+                if count else "No manual placements yet. Use Add signature or Auto-sign LoanHub.")
+        index = self.queue.currentRow()
+        if 0 <= index < len(self.signatures):
+            pix = QPixmap(self.signatures[index].signature_png)
+            if not pix.isNull():
+                self.signature_preview.setPixmap(pix.scaled(
+                    210, 80, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+                self.signature_preview.setText("")
+                return
+        self.signature_preview.setPixmap(QPixmap())
+        self.signature_preview.setText("Select a signature to preview")
+
     def refresh_document_status(self):
         if self.doc is None:
             self.sidebar_document.setText("No document opened")
@@ -461,6 +505,7 @@ class Window(QMainWindow):
             self.queue.clear()
             self.redraw()
             self.refresh_document_status()
+            self.refresh_workspace_progress()
         except Exception as exc:
             if new_doc is not None:
                 new_doc.close()
@@ -509,6 +554,7 @@ class Window(QMainWindow):
         self.status.setText(f"{Path(self.source).name} | Page {self.page_index+1}/{len(self.doc)} | "
                             f"{len(self.signatures)} signature(s)")
         self.refresh_document_status()
+        self.refresh_workspace_progress()
         self.home_panel.setVisible(False)
     def previous(self):
         if self.doc is not None and self.page_index > 0:
