@@ -481,6 +481,67 @@ class Window(QMainWindow):
         body.addWidget(button)
         dlg.exec()
 
+    def review_loanhub_signatures(self, pending, captured):
+        """Review every newly captured signature before writing a PDF."""
+        if len(captured) != len(pending):
+            return False
+        expected = {field.role for field in pending}
+        if len(expected) != len(pending) or {field.role for field, _, _ in captured} != expected:
+            return False
+        popup = QDialog(self)
+        popup.setWindowTitle("IthuteSign — Review before saving")
+        popup.setMinimumWidth(570)
+        popup.setStyleSheet("""
+            QDialog { background: #f5f8fc; color: #18304c; }
+            QLabel { color: #18304c; }
+            QLabel#reviewTitle { font-size: 20px; font-weight: 750; }
+            QLabel#reviewNote { color: #52677f; font-size: 12px; }
+            QPushButton { min-height: 38px; padding: 7px 16px;
+                border-radius: 7px; background: white; color: #18304c;
+                border: 1px solid #cbd8e6; font-weight: 600; }
+            QPushButton#saveButton { background: #087e82; color: white;
+                border: 1px solid #087e82; }
+        """)
+        body = QVBoxLayout(popup)
+        body.setContentsMargins(24, 22, 24, 22)
+        heading = QLabel("Review captured signatures")
+        heading.setObjectName("reviewTitle")
+        body.addWidget(heading)
+        note = QLabel("All required signatures for this signing session must be present. "
+                      "Existing signed fields will be preserved.")
+        note.setWordWrap(True)
+        note.setObjectName("reviewNote")
+        body.addWidget(note)
+        for field, png, accepted in captured:
+            validate_signature_png(png)
+            row = QHBoxLayout()
+            details = QVBoxLayout()
+            details.addWidget(QLabel(field.role + "  ·  Captured"))
+            details.addWidget(QLabel(accepted.strftime("%d %b %Y  %H:%M %Z")))
+            row.addLayout(details, 2)
+            picture = QLabel()
+            picture.setMinimumSize(170, 52)
+            picture.setAlignment(Qt.AlignCenter)
+            pixmap = QPixmap(png)
+            if pixmap.isNull():
+                return False
+            picture.setPixmap(pixmap.scaled(170, 52, Qt.KeepAspectRatio,
+                                           Qt.SmoothTransformation))
+            row.addWidget(picture, 1)
+            body.addLayout(row)
+        actions = QHBoxLayout()
+        actions.addStretch()
+        cancel = QPushButton("Cancel")
+        cancel.clicked.connect(popup.reject)
+        actions.addWidget(cancel)
+        approve = QPushButton("Approve & choose PDF")
+        approve.setObjectName("saveButton")
+        approve.setDefault(True)
+        approve.clicked.connect(popup.accept)
+        actions.addWidget(approve)
+        body.addLayout(actions)
+        return popup.exec() == QDialog.Accepted
+
     def confirm_signer(self, title, description, confirm_text="Continue"):
         """Consistent, accessible offline signing confirmation dialog."""
         popup = QDialog(self)
@@ -569,6 +630,8 @@ class Window(QMainWindow):
                 validate_signature_png(target)
                 captured.append((field, str(target), datetime.now().astimezone()))
                 self.show_loanhub_progress(pending, [entry[0].role for entry in captured])
+            if not self.review_loanhub_signatures(pending, captured):
+                return
             default = str(Path(self.source).with_name(Path(self.source).stem + "_signed.pdf"))
             output, _ = QFileDialog.getSaveFileName(self, "Save LoanHub signed PDF", default, "PDF (*.pdf)")
             if not output:
