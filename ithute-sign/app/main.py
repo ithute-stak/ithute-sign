@@ -228,6 +228,8 @@ class Window(QMainWindow):
         self.position = None
         self.signatures = []
         self.recent_documents = []
+        self.loanhub_access_token = None
+        self.loanhub_user = None
         base = QWidget()
         self.setCentralWidget(base)
         layout = QHBoxLayout(base)
@@ -248,6 +250,10 @@ class Window(QMainWindow):
         login_button.setMinimumHeight(42)
         login_button.clicked.connect(self.open_loanhub_login)
         menu.addWidget(login_button)
+        self.loanhub_login_status = QLabel("LoanHub: Not signed in")
+        self.loanhub_login_status.setWordWrap(True)
+        self.loanhub_login_status.setObjectName("sidebarDetail")
+        menu.addWidget(self.loanhub_login_status)
         menu.addSpacing(22)
         for title, actions in (
             ("DOCUMENTS", (("Open PDF / Word", self.open_document),
@@ -829,7 +835,10 @@ class Window(QMainWindow):
     def open_loanhub_login(self):
         """Open existing LoanHub authentication UI; do not imply an active session."""
         dialog = LoanHubLoginDialog(self)
-        dialog.exec()
+        if dialog.exec() == QDialog.Accepted and dialog.access_token and dialog.verified_user:
+            self.loanhub_access_token = dialog.access_token
+            self.loanhub_user = dialog.verified_user
+            self.loanhub_login_status.setText("LoanHub: Identity verified (company not selected)")
 
     def auto_sign_loanhub(self):
         """Offline, fail-closed workflow for the verified LoanHub contract layout."""
