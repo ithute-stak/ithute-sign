@@ -8,6 +8,7 @@ import tempfile
 import subprocess
 import shutil
 import uuid
+import os
 from datetime import datetime
 from dataclasses import replace
 from pathlib import Path
@@ -583,6 +584,63 @@ class Window(QMainWindow):
         body.addLayout(buttons)
         return popup.exec() == QDialog.Accepted
 
+    def show_loanhub_completion(self, signed, captured):
+        """Report only successfully verified exports; opening is user initiated."""
+        output = Path(signed)
+        if not output.is_file():
+            raise FileNotFoundError("Completed PDF could not be found")
+        dlg = QDialog(self)
+        dlg.setWindowTitle("IthuteSign — Contract completed")
+        dlg.setMinimumWidth(500)
+        dlg.setStyleSheet("""
+            QDialog { background: #f5f8fc; color: #18304c; }
+            QLabel { color: #18304c; }
+            QLabel#completeTitle { font-size: 21px; font-weight: 750; }
+            QLabel#completePath { color: #52677f; font-size: 12px; }
+            QPushButton { padding: 10px 15px; border-radius: 7px;
+                background: white; color: #18304c; border: 1px solid #cbd8e6;
+                font-weight: 650; }
+            QPushButton#openCompleted { background: #087e82; color: white;
+                border: 1px solid #087e82; }
+        """)
+        body = QVBoxLayout(dlg)
+        body.setContentsMargins(26, 24, 26, 24)
+        title = QLabel("Signed PDF saved successfully")
+        title.setObjectName("completeTitle")
+        body.addWidget(title)
+        body.addWidget(QLabel("✓  PDF export and signature checks passed"))
+        body.addWidget(QLabel(f"✓  {len(captured)} new signature(s) captured"))
+        body.addWidget(QLabel("✓  Original document preserved"))
+        path_label = QLabel(str(output))
+        path_label.setObjectName("completePath")
+        path_label.setWordWrap(True)
+        path_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        body.addWidget(path_label)
+        actions = QHBoxLayout()
+        actions.addStretch()
+        close = QPushButton("Done")
+        close.clicked.connect(dlg.accept)
+        actions.addWidget(close)
+        open_button = QPushButton("Open signed PDF")
+        open_button.setObjectName("openCompleted")
+        def open_signed():
+            try:
+                if sys.platform.startswith("linux"):
+                    subprocess.Popen(["xdg-open", str(output)], start_new_session=True)
+                elif sys.platform == "win32":
+                    os.startfile(str(output))
+                elif sys.platform == "darwin":
+                    subprocess.Popen(["open", str(output)], start_new_session=True)
+                else:
+                    raise RuntimeError("Opening PDFs is not supported on this platform")
+                dlg.accept()
+            except Exception as exc:
+                QMessageBox.warning(dlg, "Cannot open PDF", str(exc))
+        open_button.clicked.connect(open_signed)
+        actions.addWidget(open_button)
+        body.addLayout(actions)
+        dlg.exec()
+
     def auto_sign_loanhub(self):
         """Offline, fail-closed workflow for the verified LoanHub contract layout."""
         if self.doc is None or not self.source or Path(self.source).suffix.lower() != ".pdf":
@@ -641,7 +699,7 @@ class Window(QMainWindow):
             if sha256(self.source) != self.source_digest:
                 raise ValueError("Source PDF changed during signing")
             signed = save_loanhub_signed(self.source, output, captured)
-            QMessageBox.information(self, "LoanHub signed", "Signed PDF saved:\\n" + signed)
+            self.show_loanhub_completion(signed, captured)
         except Exception as exc:
             QMessageBox.critical(self, "LoanHub signing failed", str(exc))
 
