@@ -32,9 +32,9 @@ def detect_loanhub(pdf):
     # Coordinates are PDF points for this exact generated LoanHub template.
     specs = [
         ("Borrower witness", (402, 276, 529, 305), fitz.Rect(494, 231, 536, 247),
-         fitz.Rect(400, 312, 440, 328), fitz.Rect(399, 337, 541, 350)),
+         fitz.Rect(400, 312, 538, 328), fitz.Rect(399, 337, 541, 350)),
         ("Lender witness", (402, 411, 529, 441), fitz.Rect(494, 366, 536, 383),
-         fitz.Rect(400, 447, 440, 463), fitz.Rect(399, 473, 541, 486)),
+         fitz.Rect(400, 447, 538, 463), fitz.Rect(399, 473, 541, 486)),
     ]
     found = []
     for role, box, status, date, method in specs:
