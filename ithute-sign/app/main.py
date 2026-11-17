@@ -254,6 +254,10 @@ class Window(QMainWindow):
         self.loanhub_login_status.setWordWrap(True)
         self.loanhub_login_status.setObjectName("sidebarDetail")
         menu.addWidget(self.loanhub_login_status)
+        logout_button = QPushButton("Log out of LoanHub")
+        logout_button.setObjectName("menuButton")
+        logout_button.clicked.connect(self.logout_loanhub)
+        menu.addWidget(logout_button)
         menu.addSpacing(22)
         for title, actions in (
             ("DOCUMENTS", (("Open PDF / Word", self.open_document),
@@ -832,8 +836,16 @@ class Window(QMainWindow):
         body.addLayout(actions)
         dlg.exec()
 
+    def logout_loanhub(self):
+        """Clear the desktop session; server token revocation is not implied."""
+        self.loanhub_access_token = None
+        self.loanhub_user = None
+        self.loanhub_login_status.setText("LoanHub: Not signed in")
+
     def open_loanhub_login(self):
         """Open existing LoanHub authentication UI; do not imply an active session."""
+        # Reauthentication must never retain the previous employee's session.
+        self.logout_loanhub()
         dialog = LoanHubLoginDialog(self)
         if dialog.exec() == QDialog.Accepted and dialog.access_token and dialog.verified_user:
             self.loanhub_access_token = dialog.access_token
@@ -1019,6 +1031,7 @@ class Window(QMainWindow):
         except Exception as exc:
             QMessageBox.critical(self, "Save failed", str(exc))
     def closeEvent(self, event):
+        self.logout_loanhub()
         if self.doc is not None:
             self.doc.close()
         self.temp.cleanup()
