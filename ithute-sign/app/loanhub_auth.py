@@ -54,3 +54,29 @@ class LoanHubLoginTransport:
             raise ValueError("LoanHub login failed (HTTP %d)" % exc.code) from None
         except URLError:
             raise ConnectionError("Cannot reach the LoanHub server securely") from None
+
+    def get_authenticated(self, endpoint: str, access_token: str) -> dict:
+        """Verify session against LoanHub; never trust a login response alone."""
+        if not endpoint.startswith("/") or endpoint.startswith("//") or "?" in endpoint or "#" in endpoint:
+            raise ValueError("Invalid LoanHub endpoint")
+        if not isinstance(access_token, str) or not access_token or any(c.isspace() for c in access_token):
+            raise ValueError("Invalid LoanHub access token")
+        request = Request(self.origin + endpoint, method="GET",
+                          headers={"Accept": "application/json",
+                                   "Authorization": "Bearer " + access_token,
+                                   "Cache-Control": "no-store"})
+        try:
+            with self._opener.open(request, timeout=15) as response:
+                if response.status != 200:
+                    raise ValueError("LoanHub session verification failed")
+                raw = response.read(MAX_RESPONSE + 1)
+                if len(raw) > MAX_RESPONSE:
+                    raise ValueError("LoanHub response exceeds size limit")
+                data = json.loads(raw)
+                if not isinstance(data, dict):
+                    raise ValueError("Invalid LoanHub session response")
+                return data
+        except HTTPError as exc:
+            raise ValueError("LoanHub session verification failed (HTTP %d)" % exc.code) from None
+        except URLError:
+            raise ConnectionError("Cannot reach LoanHub for session verification") from None
