@@ -26,6 +26,7 @@ from loanhub_login_dialog import LoanHubLoginDialog
 from loanhub_company_identity import company_for_user
 from loanhub_auth import LoanHubLoginTransport
 from loanhub_presentation import employee_display_name
+from loanhub_loans_dialog import LoanHubLoansDialog
 
 def decorate_action(button, label):
     """Use native Qt icons so Linux and Windows need no extra icon packages."""
@@ -364,6 +365,12 @@ class Window(QMainWindow):
         home.addSpacing(22)
         recent_heading = QLabel("RECENT DOCUMENTS")
         recent_heading.setObjectName("homeSection")
+        loans_button = QPushButton("Loans & contracts")
+        decorate_action(loans_button, "Auto-sign LoanHub")
+        loans_button.setObjectName("quickAction")
+        loans_button.setMinimumHeight(56)
+        loans_button.clicked.connect(self.open_loanhub_loans)
+        home.addWidget(loans_button)
         home.addWidget(recent_heading)
         self.home_recent = QLabel("No documents opened yet")
         self.home_recent.setWordWrap(True)
@@ -950,6 +957,12 @@ class Window(QMainWindow):
             self.loanhub_login_status.setText("LoanHub: Company could not be verified")
             self.loanhub_account_note.setText("Your company could not be verified.")
             self.loanhub_account_note.setVisible(True)
+
+    def open_loanhub_loans(self):
+        if not self.loanhub_access_token or not self.loanhub_company:
+            QMessageBox.warning(self, "LoanHub", "Sign in and verify your company first.")
+            return
+        LoanHubLoansDialog(self.loanhub_access_token, self.loanhub_company, self).exec()
 
     def auto_sign_loanhub(self):
         """Offline, fail-closed workflow for the verified LoanHub contract layout."""
