@@ -99,8 +99,15 @@ async def send_contract(payload: ContractRequest, authorization: str = Header(de
     # Do not trust the desktop's filename as proof of contract ownership.
     # Production deployments must additionally bind the document to an
     # authorised LoanHub contract ID before enabling sends.
-    if os.environ.get("ENABLE_WHATSAPP_SEND") != "true":
-        raise HTTPException(503, "Sending disabled until contract ownership validation is configured")
+    # A workstation-provided PDF and reference cannot establish that this is
+    # the exact authorised LoanHub contract, or that this recipient is its
+    # borrower. There is deliberately no environment-variable bypass.
+    # Replace this gate only with server-side contract ID, signed-document
+    # digest, borrower/recipient and access-policy verification against
+    # existing LoanHub read-only endpoints.
+    raise HTTPException(
+        503, "Contract ownership and recipient verification is not yet available"
+    )
     delivery_id = str(uuid.uuid4())
     now = int(time.time())
     digest = hashlib.sha256(data).hexdigest()
