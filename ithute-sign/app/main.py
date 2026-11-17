@@ -310,9 +310,23 @@ class Window(QMainWindow):
             action.clicked.connect(handler)
             shortcuts.addWidget(action)
         home.addLayout(shortcuts)
-        self.home_recent = QLabel("Recent documents this session: none")
+        self.home_device = QLabel("Wacom STU-540 · Checking connection…")
+        self.home_device.setObjectName("homeDevice")
+        home.addWidget(self.home_device)
+        home.addWidget(QLabel("Recently opened this session"))
+        self.home_recent = QLabel("No documents opened yet")
         self.home_recent.setWordWrap(True)
         home.addWidget(self.home_recent)
+        self.home_recent_buttons = []
+        for _ in range(3):
+            recent_button = QPushButton()
+            recent_button.setObjectName("recentButton")
+            recent_button.setVisible(False)
+            recent_button.clicked.connect(
+                lambda checked=False, button=recent_button:
+                self.load_document(button.property("document_path")))
+            home.addWidget(recent_button)
+            self.home_recent_buttons.append(recent_button)
         home.addStretch(1)
         self.screen_stack.addWidget(self.home_panel)
         self.document_panel = QWidget()
@@ -399,6 +413,8 @@ class Window(QMainWindow):
             QPushButton#primary:hover { background: #0b999c; }
             QWidget#mainArea { background: #eef2f7; color: #18304c; }
             QWidget#homePanel { background: white; border: 1px solid #d1dce8; border-radius: 10px; }
+            QLabel#homeDevice { background: #e7f4f3; color: #13565c; padding: 15px; border-radius: 8px; font-weight: 700; }
+            QPushButton#recentButton { text-align: left; background: #f1f6fb; color: #18304c; border: 1px solid #d1dce8; border-radius: 7px; }
             QLabel#pageHeading { color: #18304c; font-size: 22px; font-weight: 750; }
             QWidget#mainArea QPushButton { padding: 8px 13px; }
             QWidget#mainArea QLabel { color: #263f5c; }
@@ -456,11 +472,23 @@ class Window(QMainWindow):
         else:
             self.sidebar_ready.setText("No manual signatures queued · Use Add signature or Auto-sign LoanHub")
 
+    def refresh_recent_documents(self):
+        self.home_recent.setText(
+            "Choose a document below to reopen it."
+            if self.recent_documents else "No documents opened yet")
+        for button, path in zip(self.home_recent_buttons, self.recent_documents):
+            button.setText(Path(path).name)
+            button.setProperty("document_path", path)
+        for i, button in enumerate(self.home_recent_buttons):
+            button.setVisible(i < len(self.recent_documents))
+
     def welcome(self):
         result = show_screen(bridge_path(), "welcome")
         self.status.setText("STU-540 welcome screen ready" if result.connected
                             else "STU-540: " + result.message)
         self.sidebar_device.setText("Wacom: connected" if result.connected else "Wacom: disconnected")
+        self.home_device.setText("●  Wacom STU-540 connected" if result.connected
+                                 else "○  Wacom STU-540 disconnected — Check device")
     def device_status(self):
         result = probe_bridge(bridge_path())
         self.sidebar_device.setText("Wacom: connected" if result.connected else "Wacom: disconnected")
@@ -505,7 +533,7 @@ class Window(QMainWindow):
             new_doc = None
             self.source = path
             self.recent_documents = ([path] + [p for p in self.recent_documents if p != path])[:3]
-            self.home_recent.setText("Recent this session: " + " · ".join(Path(p).name for p in self.recent_documents))
+            self.refresh_recent_documents()
             self.source_digest = sha256(path)
             self.preview_pdf = pdf
             self.page_index = 0
