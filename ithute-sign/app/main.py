@@ -277,6 +277,15 @@ class Window(QMainWindow):
             button.clicked.connect(handler)
             navigation.addWidget(button)
         navigation.addStretch()
+        self.page_label = QLabel("No document opened")
+        navigation.addWidget(self.page_label)
+        for label, change in (("−", -0.15), ("+", 0.15)):
+            button = QPushButton(label)
+            button.clicked.connect(lambda checked=False, step=change: self.change_zoom(step))
+            navigation.addWidget(button)
+        fit_button = QPushButton("Fit width")
+        fit_button.clicked.connect(self.fit_width)
+        navigation.addWidget(fit_button)
         workspace.addLayout(navigation)
         options = QHBoxLayout()
         options.addWidget(QLabel("Signature width (pt)"))
@@ -323,10 +332,14 @@ class Window(QMainWindow):
             QWidget#mainArea { background: #eef2f7; color: #18304c; }
             QLabel#pageHeading { color: #18304c; font-size: 22px; font-weight: 750; }
             QWidget#mainArea QPushButton { padding: 8px 13px; }
+            QWidget#mainArea QLabel { color: #263f5c; }
+            QWidget#mainArea QSpinBox { background: white; color: #18304c;
+                border: 1px solid #bdcbd9; border-radius: 5px; padding: 5px; }
             QWidget#mainArea QListWidget { background: white; border: 1px solid #d1dce8; border-radius: 8px; }
             QWidget#mainArea QScrollArea { border: 1px solid #d1dce8; background: #dce4ed; }
         """)
         self.status = QLabel("Connect STU-540. Open a document to begin.")
+        self.status.setStyleSheet("color: #38546d; font-weight: 600; padding: 5px;")
         workspace.addWidget(self.status)
         from PySide6.QtCore import QTimer
         QTimer.singleShot(300, self.welcome)
@@ -376,10 +389,22 @@ class Window(QMainWindow):
             if new_doc is not None:
                 new_doc.close()
             QMessageBox.critical(self, "Open failed", str(exc))
+    def change_zoom(self, delta):
+        if self.doc is not None:
+            self.zoom = max(0.4, min(3.0, round(self.zoom + delta, 2)))
+            self.redraw()
+
+    def fit_width(self):
+        if self.doc is not None:
+            available = max(250, self.scroll.viewport().width() - 24)
+            self.zoom = max(0.4, min(3.0, available / self.doc[self.page_index].rect.width))
+            self.redraw()
+
     def redraw(self):
         if self.doc is None:
             return
         page = self.doc[self.page_index]
+        self.page_label.setText(f"Page {self.page_index + 1} of {len(self.doc)} · {self.zoom * 100:.0f}%")
         pixels = page.get_pixmap(matrix=fitz.Matrix(self.zoom, self.zoom))
         image = QPixmap.fromImage(QImage(pixels.samples, pixels.width, pixels.height,
                                         pixels.stride, QImage.Format_RGB888).copy())
