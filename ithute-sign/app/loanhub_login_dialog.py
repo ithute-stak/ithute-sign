@@ -14,6 +14,8 @@ class LoanHubLoginDialog(QDialog):
         self.setWindowTitle("IthuteSign | LoanHub login")
         self.setMinimumWidth(430)
         self.response = None
+        self.access_token = None
+        self.verified_user = None
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel("Sign in with your existing LoanHub account"))
         form = QFormLayout()
@@ -51,8 +53,27 @@ class LoanHubLoginDialog(QDialog):
             if any(k in response for k in ("mfa_required", "requires_mfa", "otp_required")):
                 self.status.setText("This LoanHub account requires additional verification. Use LoanHub to complete it.")
                 return
-            self.response = response
-            self.status.setText("Login response received. Session and company membership validation are pending.")
+            token = response.get("access_token")
+            if not isinstance(token, str) or not token.strip():
+                self.status.setText("LoanHub did not return a supported access token. Login not completed.")
+                return
+            transport = LoanHubLoginTransport(self.origin.text())
+            verified = transport.get_authenticated("/api/v1/auth/me", token)
+            user = verified.get("user") if isinstance(verified.get("user"), dict) else verified
+            if not isinstance(user, dict) or not (user.get("id") or user.get("user_id")):
+                self.status.setText("LoanHub session identity could not be verified.")
+                return
+            if user.get("is_active") is False or user.get("active") is False:
+                self.status.setText("LoanHub user account is inactive.")
+                return
+            if user.get("must_change_password") is True or user.get("requires_password_change") is True:
+                self.status.setText("Change your password in LoanHub before using IthuteSign.")
+                return
+            self.access_token = token
+            self.verified_user = user
+            self.response = None
+            self.password.clear()
+            self.accept()
         except Exception as exc:
             self.status.setText(str(exc))
         finally:
