@@ -226,6 +226,7 @@ class Window(QMainWindow):
         self.zoom = 1.2
         self.position = None
         self.signatures = []
+        self.recent_documents = []
         base = QWidget()
         self.setCentralWidget(base)
         layout = QHBoxLayout(base)
@@ -290,6 +291,30 @@ class Window(QMainWindow):
         heading = QLabel("Document workspace")
         heading.setObjectName("pageHeading")
         workspace.addWidget(heading)
+        self.home_panel = QWidget()
+        self.home_panel.setObjectName("homePanel")
+        home = QVBoxLayout(self.home_panel)
+        home.setContentsMargins(22, 20, 22, 20)
+        welcome_title = QLabel("Welcome to IthuteSign")
+        welcome_title.setObjectName("pageHeading")
+        home.addWidget(welcome_title)
+        intro = QLabel("Sign documents locally with your Wacom STU-540. "
+                       "Choose a document to begin; no internet connection is required.")
+        intro.setWordWrap(True)
+        home.addWidget(intro)
+        shortcuts = QHBoxLayout()
+        for label, handler in (("Open PDF / Word", self.open_document),
+                               ("Auto-sign LoanHub", self.open_loanhub_from_home),
+                               ("Check Wacom", self.device_status)):
+            action = QPushButton(label)
+            action.setMinimumHeight(44)
+            action.clicked.connect(handler)
+            shortcuts.addWidget(action)
+        home.addLayout(shortcuts)
+        self.home_recent = QLabel("Recent documents this session: none")
+        self.home_recent.setWordWrap(True)
+        home.addWidget(self.home_recent)
+        workspace.addWidget(self.home_panel)
         navigation = QHBoxLayout()
         for label, handler in (("← Previous page", self.previous), ("Next page →", self.next)):
             button = QPushButton(label)
@@ -350,6 +375,7 @@ class Window(QMainWindow):
             QPushButton#primary { background: #087e82; }
             QPushButton#primary:hover { background: #0b999c; }
             QWidget#mainArea { background: #eef2f7; color: #18304c; }
+            QWidget#homePanel { background: white; border: 1px solid #d1dce8; border-radius: 10px; }
             QLabel#pageHeading { color: #18304c; font-size: 22px; font-weight: 750; }
             QWidget#mainArea QPushButton { padding: 8px 13px; }
             QWidget#mainArea QLabel { color: #263f5c; }
@@ -394,6 +420,17 @@ class Window(QMainWindow):
         if path:
             self.load_document(path)
 
+    def open_loanhub_from_home(self):
+        if self.doc is None:
+            path, _ = QFileDialog.getOpenFileName(
+                self, "Open LoanHub contract", "", "PDF (*.pdf)")
+            if not path:
+                return
+            self.load_document(path)
+            if self.doc is None or self.source != str(Path(path).resolve()):
+                return
+        self.auto_sign_loanhub()
+
     def load_document(self, path):
         """Open a document explicitly supplied by a trusted local desktop launch."""
         path = str(Path(path).resolve())
@@ -414,6 +451,8 @@ class Window(QMainWindow):
             self.doc = new_doc
             new_doc = None
             self.source = path
+            self.recent_documents = ([path] + [p for p in self.recent_documents if p != path])[:3]
+            self.home_recent.setText("Recent this session: " + " · ".join(Path(p).name for p in self.recent_documents))
             self.source_digest = sha256(path)
             self.preview_pdf = pdf
             self.page_index = 0
@@ -470,6 +509,7 @@ class Window(QMainWindow):
         self.status.setText(f"{Path(self.source).name} | Page {self.page_index+1}/{len(self.doc)} | "
                             f"{len(self.signatures)} signature(s)")
         self.refresh_document_status()
+        self.home_panel.setVisible(False)
     def previous(self):
         if self.doc is not None and self.page_index > 0:
             self.page_index -= 1
