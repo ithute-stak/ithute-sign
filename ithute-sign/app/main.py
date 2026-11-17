@@ -442,6 +442,47 @@ class Window(QMainWindow):
             self.page_index += 1
             self.position = None
             self.redraw()
+    def confirm_signer(self, title, description, confirm_text="Continue"):
+        """Consistent, accessible offline signing confirmation dialog."""
+        popup = QDialog(self)
+        popup.setWindowTitle("IthuteSign — " + title)
+        popup.setModal(True)
+        popup.setMinimumWidth(440)
+        popup.setStyleSheet("""
+            QDialog { background: #f5f8fc; color: #18304c; }
+            QLabel { color: #18304c; }
+            QLabel#dialogHeading { font-size: 18px; font-weight: 700; }
+            QLabel#dialogBody { font-size: 13px; }
+            QPushButton { min-height: 37px; min-width: 105px; padding: 5px 15px;
+                border-radius: 7px; border: 1px solid #bdcbd9; background: white;
+                color: #18304c; font-weight: 600; }
+            QPushButton#confirmButton { background: #087e82; color: white;
+                border: 1px solid #087e82; }
+        """)
+        body = QVBoxLayout(popup)
+        body.setContentsMargins(26, 24, 26, 22)
+        body.setSpacing(15)
+        heading = QLabel(title)
+        heading.setObjectName("dialogHeading")
+        body.addWidget(heading)
+        message = QLabel(description)
+        message.setObjectName("dialogBody")
+        message.setWordWrap(True)
+        message.setMinimumWidth(380)
+        body.addWidget(message)
+        buttons = QHBoxLayout()
+        buttons.addStretch()
+        cancel = QPushButton("Cancel")
+        cancel.clicked.connect(popup.reject)
+        buttons.addWidget(cancel)
+        proceed = QPushButton(confirm_text)
+        proceed.setObjectName("confirmButton")
+        proceed.setDefault(True)
+        proceed.clicked.connect(popup.accept)
+        buttons.addWidget(proceed)
+        body.addLayout(buttons)
+        return popup.exec() == QDialog.Accepted
+
     def auto_sign_loanhub(self):
         """Offline, fail-closed workflow for the verified LoanHub contract layout."""
         if self.doc is None or not self.source or Path(self.source).suffix.lower() != ".pdf":
@@ -461,22 +502,24 @@ class Window(QMainWindow):
             QMessageBox.information(self, "LoanHub", "No pending witness fields found.")
             return
         roles = "\\n".join("• " + f.role for f in pending)
-        if QMessageBox.question(
-            self, "Confirm LoanHub signatories",
-            "The following pending roles were detected on page 7:\\n" + roles
-            + "\\n\\nConfirm the people signing are authorized for these roles."
-            + "\\nExisting SIGNED roles will not be changed.",
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.No) != QMessageBox.Yes:
+        if not self.confirm_signer(
+            "Review detected signatories",
+            "The following fields require signatures on page 7:\\n\\n"
+            + roles + "\\n\\nConfirm that the correct people are present."
+            + "\\nExisting signed records will not be overwritten.",
+            "Start signing"):
             return
         captured = []
         try:
             self.page_index = 6
             self.redraw()
             for field in pending:
-                if QMessageBox.question(
-                    self, "Next signatory: " + field.role,
-                    "Ask the " + field.role + " to sign on the Wacom STU-540.\\nContinue?",
-                    QMessageBox.Yes | QMessageBox.No, QMessageBox.No) != QMessageBox.Yes:
+                if not self.confirm_signer(
+                    "Next signatory: " + field.role,
+                    "Please ask the " + field.role
+                    + " to sign on the Wacom STU-540.\\n\\n"
+                    + "Only continue when the correct signer is ready.",
+                    "Capture signature"):
                     return
                 dialog = CaptureDialog(self.temp.name, self)
                 if dialog.exec() != QDialog.Accepted:
