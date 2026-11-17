@@ -269,7 +269,6 @@ class Window(QMainWindow):
         brand = QLabel("ITHUTESIGN")
         brand.setObjectName("brand")
         menu.addWidget(brand)
-        menu.addWidget(QLabel("OFFLINE SIGNING WORKSPACE"))
         login_button = QPushButton("Log in to LoanHub")
         decorate_action(login_button, "Log in to LoanHub")
         login_button.setObjectName("primary")
@@ -320,7 +319,6 @@ class Window(QMainWindow):
         self.sidebar_device.setObjectName("sidebarDetail")
         menu.addWidget(self.sidebar_device)
         menu.addSpacing(10)
-        menu.addWidget(QLabel("LOCAL MODE  •  NO INTERNET REQUIRED"))
         layout.addWidget(sidebar)
         main = QWidget()
         main.setObjectName("mainArea")
@@ -332,26 +330,30 @@ class Window(QMainWindow):
         self.home_panel = QWidget()
         self.home_panel.setObjectName("homePanel")
         home = QVBoxLayout(self.home_panel)
-        home.setContentsMargins(22, 20, 22, 20)
-        welcome_title = QLabel("Welcome to IthuteSign")
+        home.setContentsMargins(32, 30, 32, 30)
+        home.setSpacing(12)
+        welcome_title = QLabel("Signing workspace")
         welcome_title.setObjectName("pageHeading")
         home.addWidget(welcome_title)
-        intro = QLabel("Sign documents locally with your Wacom STU-540. "
-                       "Choose a document to begin; no internet connection is required.")
-        intro.setWordWrap(True)
-        home.addWidget(intro)
-        self.loanhub_account_name = QLabel("LoanHub account: Not signed in")
-        self.loanhub_account_name.setObjectName("pageHeading")
+        self.loanhub_account_name = QLabel("Sign in to LoanHub to get started")
+        self.loanhub_account_name.setObjectName("homeSubtitle")
         home.addWidget(self.loanhub_account_name)
-        self.loanhub_account_note = QLabel("Sign in to access your verified LoanHub company.")
+        self.loanhub_account_note = QLabel("")
+        self.loanhub_account_note.setObjectName("homeNotice")
         self.loanhub_account_note.setWordWrap(True)
+        self.loanhub_account_note.setVisible(False)
         home.addWidget(self.loanhub_account_note)
+        home.addSpacing(20)
+        quick_heading = QLabel("QUICK ACTIONS")
+        quick_heading.setObjectName("homeSection")
+        home.addWidget(quick_heading)
         shortcuts = QHBoxLayout()
         for label, handler in (("Open PDF / Word", self.open_document),
                                ("Auto-sign LoanHub", self.open_loanhub_from_home),
                                ("Check Wacom", self.device_status)):
             action = QPushButton(label)
-            action.setMinimumHeight(44)
+            action.setMinimumHeight(64)
+            action.setObjectName("quickAction")
             decorate_action(action, label)
             action.clicked.connect(handler)
             shortcuts.addWidget(action)
@@ -359,7 +361,10 @@ class Window(QMainWindow):
         self.home_device = QLabel("Wacom STU-540 · Checking connection…")
         self.home_device.setObjectName("homeDevice")
         home.addWidget(self.home_device)
-        home.addWidget(QLabel("Recently opened this session"))
+        home.addSpacing(22)
+        recent_heading = QLabel("RECENT DOCUMENTS")
+        recent_heading.setObjectName("homeSection")
+        home.addWidget(recent_heading)
         self.home_recent = QLabel("No documents opened yet")
         self.home_recent.setWordWrap(True)
         home.addWidget(self.home_recent)
@@ -458,7 +463,13 @@ class Window(QMainWindow):
             QPushButton#primary { background: #087e82; }
             QPushButton#primary:hover { background: #0b999c; }
             QWidget#mainArea { background: #eef2f7; color: #18304c; }
-            QWidget#homePanel { background: white; border: 1px solid #d1dce8; border-radius: 10px; }
+            QWidget#homePanel { background: white; border: 1px solid #e0e7f0; border-radius: 16px; }
+            QLabel#homeSubtitle { color: #71839a; font-size: 14px; }
+            QLabel#homeSection { color: #71839a; font-size: 11px; font-weight: 800; }
+            QLabel#homeNotice { background: #fff3e7; color: #915518; padding: 12px; border-radius: 9px; }
+            QPushButton#quickAction { background: #f6f9fd; color: #17324f; border: 1px solid #dbe5f0;
+                border-radius: 12px; font-size: 13px; font-weight: 700; }
+            QPushButton#quickAction:hover { background: #e9f5f5; border-color: #0b9290; }
             QLabel#homeDevice { background: #e7f4f3; color: #13565c; padding: 15px; border-radius: 8px; font-weight: 700; }
             QPushButton#recentButton { text-align: left; background: #f1f6fb; color: #18304c; border: 1px solid #d1dce8; border-radius: 7px; }
             QLabel#pageHeading { color: #18304c; font-size: 22px; font-weight: 750; }
@@ -879,9 +890,9 @@ class Window(QMainWindow):
             self.loanhub_session_button.style().unpolish(self.loanhub_session_button)
             self.loanhub_session_button.style().polish(self.loanhub_session_button)
         if hasattr(self, "loanhub_account_name"):
-            self.loanhub_account_name.setText("LoanHub account: Not signed in")
-            self.loanhub_account_note.setText(
-                "Signed out. Sign in with your LoanHub employee account.")
+            self.loanhub_account_name.setText("Sign in to LoanHub to get started")
+            self.loanhub_account_note.setText("")
+            self.loanhub_account_note.setVisible(False)
         if hasattr(self, "screen_stack") and hasattr(self, "home_panel"):
             self.screen_stack.setCurrentWidget(self.home_panel)
 
@@ -907,8 +918,8 @@ class Window(QMainWindow):
             self.loanhub_login_status.setText("LoanHub: Identity verified (company not selected)")
             display = employee_display_name(self.loanhub_user)
             self.loanhub_account_name.setText("Welcome, " + str(display))
-            self.loanhub_account_note.setText(
-                "LoanHub identity verified. Company membership and document access are pending.")
+            self.loanhub_account_note.setText("")
+            self.loanhub_account_note.setVisible(False)
             self.screen_stack.setCurrentWidget(self.home_panel)
             self.identify_loanhub_company()
 
@@ -929,17 +940,16 @@ class Window(QMainWindow):
             except Exception:
                 self.loanhub_company = None
                 self.loanhub_login_status.setText("LoanHub: Company details unavailable")
-                self.loanhub_account_note.setText(
-                    "Company membership found, but company details could not be verified.")
+                self.loanhub_account_note.setText("Company details could not be verified.")
+                self.loanhub_account_note.setVisible(True)
                 return
             self.loanhub_login_status.setText("LoanHub: " + self.loanhub_company["name"])
-            self.loanhub_account_note.setText(
-                "Company identified from your LoanHub account. Client and contract access is pending.")
+            self.loanhub_account_note.setText("")
+            self.loanhub_account_note.setVisible(False)
         else:
             self.loanhub_login_status.setText("LoanHub: Company could not be verified")
-            self.loanhub_account_note.setText(
-                "Signed in, but LoanHub did not return one unambiguous company. "
-                "Company documents remain unavailable until the account binding is verified.")
+            self.loanhub_account_note.setText("Your company could not be verified.")
+            self.loanhub_account_note.setVisible(True)
 
     def auto_sign_loanhub(self):
         """Offline, fail-closed workflow for the verified LoanHub contract layout."""
