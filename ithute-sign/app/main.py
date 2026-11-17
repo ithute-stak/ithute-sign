@@ -262,6 +262,24 @@ class Window(QMainWindow):
                 menu.addWidget(button)
             menu.addSpacing(14)
         menu.addStretch()
+        status_title = QLabel("DOCUMENT STATUS")
+        status_title.setObjectName("section")
+        menu.addWidget(status_title)
+        self.sidebar_document = QLabel("No document opened")
+        self.sidebar_document.setWordWrap(True)
+        self.sidebar_document.setObjectName("sidebarDetail")
+        menu.addWidget(self.sidebar_document)
+        self.sidebar_progress = QLabel("Signatures: 0")
+        self.sidebar_progress.setObjectName("sidebarDetail")
+        menu.addWidget(self.sidebar_progress)
+        self.sidebar_ready = QLabel("Open a document to begin")
+        self.sidebar_ready.setWordWrap(True)
+        self.sidebar_ready.setObjectName("sidebarDetail")
+        menu.addWidget(self.sidebar_ready)
+        self.sidebar_device = QLabel("Wacom: checking…")
+        self.sidebar_device.setObjectName("sidebarDetail")
+        menu.addWidget(self.sidebar_device)
+        menu.addSpacing(10)
         menu.addWidget(QLabel("LOCAL MODE  •  NO INTERNET REQUIRED"))
         layout.addWidget(sidebar)
         main = QWidget()
@@ -322,6 +340,7 @@ class Window(QMainWindow):
             QWidget#sidebar QLabel { color: #b7c8db; font-weight: 600; }
             QLabel#brand { color: white; font-size: 23px; font-weight: 800; }
             QLabel#section { color: #8faac4; font-size: 11px; }
+            QLabel#sidebarDetail { color: #e0ebf5; font-size: 12px; padding: 2px 0; }
             QPushButton#menuButton, QPushButton#primary {
                 text-align: left; padding: 9px 13px; border: none;
                 border-radius: 8px; background: #203954; color: white;
@@ -344,12 +363,28 @@ class Window(QMainWindow):
         workspace.addWidget(self.status)
         from PySide6.QtCore import QTimer
         QTimer.singleShot(300, self.welcome)
+    def refresh_document_status(self):
+        if self.doc is None:
+            self.sidebar_document.setText("No document opened")
+            self.sidebar_progress.setText("Signatures: 0")
+            self.sidebar_ready.setText("Open a document to begin")
+            return
+        self.sidebar_document.setText(Path(self.source).name if self.source else "Document")
+        count = len(self.signatures)
+        self.sidebar_progress.setText(f"Manual placements: {count}")
+        if count:
+            self.sidebar_ready.setText("Manual signatures queued · Save PDF when ready")
+        else:
+            self.sidebar_ready.setText("No manual signatures queued · Use Add signature or Auto-sign LoanHub")
+
     def welcome(self):
         result = show_screen(bridge_path(), "welcome")
         self.status.setText("STU-540 welcome screen ready" if result.connected
                             else "STU-540: " + result.message)
+        self.sidebar_device.setText("Wacom: connected" if result.connected else "Wacom: disconnected")
     def device_status(self):
         result = probe_bridge(bridge_path())
+        self.sidebar_device.setText("Wacom: connected" if result.connected else "Wacom: disconnected")
         QMessageBox.information(self, "Device connection",
                                 ("Connected" if result.connected else "Disconnected")
                                 + "\n" + result.message)
@@ -386,6 +421,7 @@ class Window(QMainWindow):
             self.signatures.clear()
             self.queue.clear()
             self.redraw()
+            self.refresh_document_status()
         except Exception as exc:
             if new_doc is not None:
                 new_doc.close()
@@ -433,6 +469,7 @@ class Window(QMainWindow):
         self.page.setFixedSize(image.size())
         self.status.setText(f"{Path(self.source).name} | Page {self.page_index+1}/{len(self.doc)} | "
                             f"{len(self.signatures)} signature(s)")
+        self.refresh_document_status()
     def previous(self):
         if self.doc is not None and self.page_index > 0:
             self.page_index -= 1
