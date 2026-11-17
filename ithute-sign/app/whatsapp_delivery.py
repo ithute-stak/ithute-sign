@@ -61,3 +61,30 @@ def submit_signed_contract(origin, access_token, company_id, number, pdf_path, r
         raise ValueError("Delivery service rejected request (HTTP %s)" % exc.code) from None
     except URLError:
         raise ConnectionError("Cannot reach secure WhatsApp delivery service") from None
+
+
+def fetch_delivery_status(origin, access_token, delivery_id):
+    """Fetch the provider-reported state of a previously submitted delivery."""
+    from uuid import UUID
+    origin = validate_delivery_url(origin)
+    delivery_id = str(UUID(str(delivery_id)))
+    request = Request(
+        origin + "/v1/whatsapp/deliveries/" + delivery_id,
+        method="GET",
+        headers={"Authorization": "Bearer " + access_token,
+                 "Accept": "application/json", "Cache-Control": "no-store"},
+    )
+    try:
+        with urlopen(request, timeout=15, context=ssl.create_default_context()) as response:
+            result = json.loads(response.read(16385))
+            if not isinstance(result, dict) or result.get("delivery_id") != delivery_id:
+                raise ValueError("Unexpected delivery status response")
+            status = result.get("status")
+            if status not in ("submitting", "accepted", "sent", "delivered",
+                              "read", "failed", "submission_failed"):
+                raise ValueError("Unrecognised delivery status")
+            return status
+    except HTTPError as exc:
+        raise ValueError("Could not retrieve delivery status (HTTP %s)" % exc.code) from None
+    except URLError:
+        raise ConnectionError("Cannot reach secure WhatsApp delivery service") from None
