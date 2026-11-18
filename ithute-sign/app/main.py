@@ -1026,23 +1026,44 @@ class Window(QMainWindow):
             pending = sorted(pending, key=lambda field:
                 0 if field.role == "Lender execution" else
                 1 if field.role == "Borrower execution" else 2)
+            employee = getattr(self, "local_user", None)
+            enrolled = getattr(self, "session_signature", None)
+            reusable_roles = {"Lender execution", "Borrower witness", "Lender witness"}
+            reusable = [field for field in pending if field.role in reusable_roles]
+            # Witness names in this fixed template must match the signed-in
+            # employee. A lender signature also needs explicit authorization.
+            witness_name_boxes = {
+                "Borrower witness": fitz.Rect(400, 246, 539, 272),
+                "Lender witness": fitz.Rect(400, 383, 539, 410),
+            }
+            if reusable and employee and enrolled:
+                for field in reusable:
+                    if field.role in witness_name_boxes:
+                        named = " ".join(self.doc[6].get_textbox(
+                            witness_name_boxes[field.role]).split())
+                        expected = " ".join(employee["display_name"].split())
+                        if named.casefold() != expected.casefold():
+                            raise ValueError(
+                                field.role + " is assigned to '" + named +
+                                "', not the logged-in employee '" + expected +
+                                "'. Another witness must sign this field.")
+                roles = ", ".join(field.role for field in reusable)
+                answer = QMessageBox.question(
+                    self, "Confirm offline signing authority",
+                    "Apply the registered signature of " + employee["display_name"]
+                    + " to: " + roles + "?\n\n"
+                    "By confirming, you attest that you personally witnessed "
+                    "the events indicated by any witness fields and are authorized "
+                    "to sign any lender field. The borrower must sign separately.",
+                    QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+                if answer != QMessageBox.Yes:
+                    return
             for field in pending:
-                if field.role == "Lender execution" and getattr(self, "session_signature", None):
-                    employee = getattr(self, "local_user", None)
-                    if not employee:
-                        raise ValueError("Local employee session is required for lender signing")
-                    consent = QMessageBox.question(
-                        self, "Authorize lender signature",
-                        "Apply the enrolled signature of " + employee["display_name"]
-                        + " to the LENDER EXECUTION field of this LoanHub contract? "
-                          "Confirm only if you are authorized to sign for the lender.",
-                        QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
-                    if consent != QMessageBox.Yes:
-                        return
-                    target = Path(self.temp.name) / ("loanhub_lender_" + uuid.uuid4().hex + ".png")
+                if field in reusable and employee and enrolled:
+                    target = Path(self.temp.name) / ("loanhub_employee_" + uuid.uuid4().hex + ".png")
                     fd = os.open(str(target), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
                     with os.fdopen(fd, "wb") as out:
-                        out.write(self.session_signature)
+                        out.write(enrolled)
                     validate_signature_png(target)
                     captured.append((field, str(target), datetime.now().astimezone()))
                     continue
