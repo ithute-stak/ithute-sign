@@ -801,7 +801,7 @@ class Window(QMainWindow):
             validate_signature_png(png)
             row = QHBoxLayout()
             details = QVBoxLayout()
-            details.addWidget(QLabel(field.role + "  ·  Captured"))
+            details.addWidget(QLabel(field.role + "  ·  " + method))
             details.addWidget(QLabel(accepted.strftime("%d %b %Y  %H:%M %Z")))
             row.addLayout(details, 2)
             picture = QLabel()
