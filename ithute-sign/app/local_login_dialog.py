@@ -5,6 +5,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QFormLayout,
     QLabel, QLineEdit, QPushButton, QMessageBox, QFrame, QWidget, QCheckBox)
 from local_users import LocalUsers
+from signature_vault import SignatureVault
 
 
 def default_user_db():
@@ -19,6 +20,7 @@ class LocalLoginDialog(QDialog):
         self.setMinimumSize(540, 560)
         self.resize(570, 620)
         self.user = None
+        self.unlocked_signature = None
         self.store = LocalUsers(db_path or default_user_db())
         self.enrollment = self.store.db.execute(
             "SELECT COUNT(*) FROM local_users").fetchone()[0] == 0
@@ -157,9 +159,19 @@ class LocalLoginDialog(QDialog):
             self.user = self.store.authenticate(self.username.text(), self.password.text())
             if self.user is None:
                 raise ValueError("Invalid credentials or inactive account")
+            # Unlock once at login; never retain the password in the session.
+            vault = SignatureVault(self.store.path)
+            try:
+                if vault.has_signature(self.user["id"]):
+                    self.unlocked_signature = vault.decrypt(
+                        self.user["id"], self.password.text())
+            finally:
+                vault.close()
         except Exception as exc:
             QMessageBox.warning(self, "Authentication failed", str(exc))
             return
+        self.password.clear()
+        self.confirm.clear()
         self.accept()
 
     def done(self, result):
