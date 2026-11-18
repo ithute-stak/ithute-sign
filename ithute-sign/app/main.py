@@ -248,7 +248,7 @@ class PageView(QLabel):
 class Window(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("IthuteSign — Document signing")
+        self.setWindowTitle("IthuteSign — Offline LoanHub signing | build 2026.11.18-B")
         self.resize(1150, 830)
         self.temp = tempfile.TemporaryDirectory(prefix="ithutesign_")
         self.doc = None
