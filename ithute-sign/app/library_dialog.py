@@ -193,11 +193,13 @@ class SignedLibraryDialog(QDialog):
         self.open_button = QPushButton("Open PDF")
         self.download_button = QPushButton("↓ Download PDF")
         self.download_button.setObjectName("downloadButton")
+        self.properties_button = QPushButton("Properties")
         self.email_button = QPushButton("Email via iMail")
         self.close_button = QPushButton("Close")
         footer.addWidget(self.open_button)
         footer.addWidget(self.download_button)
         footer.addWidget(self.email_button)
+        footer.addWidget(self.properties_button)
         footer.addWidget(self.close_button)
         root.addLayout(footer)
 
@@ -212,6 +214,7 @@ class SignedLibraryDialog(QDialog):
         self.open_button.clicked.connect(self.open_selected)
         self.download_button.clicked.connect(self.download_selected)
         self.email_button.clicked.connect(self.email_selected)
+        self.properties_button.clicked.connect(self.show_properties)
         self.close_button.clicked.connect(self.reject)
         self.shortcuts = []
         for key, action in (("Ctrl+F", self.search.setFocus),
@@ -219,7 +222,8 @@ class SignedLibraryDialog(QDialog):
                             ("Ctrl+O", self.open_selected),
                             ("Alt+Left", self.go_back),
                             ("Alt+Up", lambda: self.navigate(None)),
-                            ("F5", self.refresh)):
+                            ("F5", self.refresh),
+                            ("Alt+Return", self.show_properties)):
             shortcut = QShortcut(QKeySequence(key), self)
             shortcut.activated.connect(action)
             self.shortcuts.append(shortcut)
@@ -254,6 +258,8 @@ class SignedLibraryDialog(QDialog):
             menu.addAction("Open PDF", self.open_selected)
             menu.addAction("Download a copy…", self.download_selected)
             menu.addAction("Email via iMail", self.email_selected)
+            menu.addSeparator()
+            menu.addAction("Properties", self.show_properties)
         menu.exec(view.viewport().mapToGlobal(pos))
 
     def folder_changed(self, current, previous):
@@ -401,7 +407,14 @@ class SignedLibraryDialog(QDialog):
                     item.setToolTip(f"Client: {folder}\\nSaved: {date}\\nSize: {size_kb} KB")
                     widget.addItem(item)
         self.count.setText(f"{len(self.groups)} client folders  •  {len(self.entries)} documents")
-        self.status.setText(f"{len(folders)} folders  •  {len(shown)} documents shown")
+        total_bytes = 0
+        for _, path in shown:
+            try:
+                total_bytes += path.stat().st_size
+            except OSError:
+                pass
+        self.status.setText(
+            f"{len(folders)} folders  •  {len(shown)} PDFs  •  {total_bytes / 1048576:.2f} MB shown")
         if selected is not None:
             for widget in self.lists:
                 if isinstance(widget, QTreeWidget):
@@ -467,6 +480,36 @@ class SignedLibraryDialog(QDialog):
         pdf = self.selected_pdf()
         if pdf:
             IMailDeliveryDialog(str(pdf), self).exec()
+
+    def show_properties(self):
+        """Read-only metadata and integrity information for the selected PDF."""
+        key = self.current_record()
+        if not key or key.startswith("folder:"):
+            QMessageBox.information(self, "Document properties", "Select a PDF document first.")
+            return
+        for record, path in self.entries:
+            if record.get("id") != key:
+                continue
+            try:
+                verified = verify_archived_pdf(record, path)
+                size = verified.stat().st_size
+                integrity = "Verified"
+            except (OSError, ValueError):
+                size = None
+                integrity = "FAILED — do not distribute this document"
+            name = str(record.get("name") or "Document")
+            national_id = str(record.get("national_id") or "Legacy / unassigned")
+            created = str(record.get("created_at") or "Unknown").replace("T", " ")
+            QMessageBox.information(
+                self, "PDF properties",
+                f"Document: {name}\\nClient National ID: {national_id}\\n"
+                f"Saved: {created}\\nType: PDF\\n"
+                f"Size: {size:,} bytes\\n" if size is not None else
+                f"Document: {name}\\nClient National ID: {national_id}\\n"
+                f"Saved: {created}\\nType: PDF\\nSize: unavailable\\n"
+                f"Integrity: {integrity}"
+            )
+            return
 
     def download_selected(self):
         """Save a verified copy to a user-selected location, never move the archive."""
