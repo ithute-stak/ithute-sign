@@ -3,11 +3,11 @@ from collections import defaultdict
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QSize
-from PySide6.QtGui import QIcon, QPixmap, QPainter, QColor, QFont, QPen
+from PySide6.QtGui import QIcon, QPixmap, QPainter, QColor, QFont, QPen, QShortcut, QKeySequence
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
     QTreeWidget, QTreeWidgetItem, QListWidget, QListWidgetItem, QSplitter,
-    QWidget, QStackedWidget, QMessageBox, QStyle, QAbstractItemView, QFileDialog, QComboBox, QHeaderView,
+    QWidget, QStackedWidget, QMessageBox, QStyle, QAbstractItemView, QFileDialog, QComboBox, QHeaderView, QMenu,
 )
 
 from signed_library import list_signed_pdfs, verify_archived_pdf
@@ -153,6 +153,7 @@ class SignedLibraryDialog(QDialog):
         details.header().setStretchLastSection(False)
         for column, width in enumerate((245, 155, 145, 70, 90)):
             details.setColumnWidth(column, width)
+        details.header().sectionClicked.connect(self.sort_by_column)
         details.itemDoubleClicked.connect(self.activate_item)
         details.currentItemChanged.connect(self.preview_selection)
         self.lists.append(details)
@@ -170,6 +171,10 @@ class SignedLibraryDialog(QDialog):
         tiles.currentItemChanged.connect(self.preview_selection)
         self.lists.append(tiles)
         self.views.addWidget(tiles)
+        for view in self.lists:
+            view.setContextMenuPolicy(Qt.CustomContextMenu)
+            view.customContextMenuRequested.connect(
+                lambda pos, source=view: self.show_document_menu(source, pos))
         panel_layout.addWidget(self.views)
         splitter.addWidget(panel)
         self.preview = PdfPreview()
@@ -207,8 +212,44 @@ class SignedLibraryDialog(QDialog):
         self.download_button.clicked.connect(self.download_selected)
         self.email_button.clicked.connect(self.email_selected)
         self.close_button.clicked.connect(self.reject)
+        self.shortcuts = []
+        for key, action in (("Ctrl+F", self.search.setFocus),
+                            ("Ctrl+S", self.download_selected),
+                            ("Ctrl+O", self.open_selected),
+                            ("Alt+Left", self.go_back),
+                            ("Alt+Up", lambda: self.navigate(None)),
+                            ("F5", self.refresh)):
+            shortcut = QShortcut(QKeySequence(key), self)
+            shortcut.activated.connect(action)
+            self.shortcuts.append(shortcut)
         self.refresh()
         self.navigate(None, record_history=False)
+
+    def sort_by_column(self, column):
+        """Keep both views in the same ordering after a header click."""
+        mapping = {0: (2, 3), 1: (2, 3), 2: (0, 1), 4: (4, 5)}
+        if column not in mapping:
+            return
+        ascending, descending = mapping[column]
+        current = self.sort_choice.currentIndex()
+        self.sort_choice.setCurrentIndex(descending if current == ascending else ascending)
+
+    def show_document_menu(self, view, pos):
+        """Actions operate on the item under the pointer, not stale selection."""
+        item = view.itemAt(pos)
+        if item is None:
+            return
+        view.setCurrentItem(item)
+        key = self.item_key(item)
+        menu = QMenu(self)
+        if isinstance(key, str) and key.startswith("folder:"):
+            action = menu.addAction("Open folder")
+            action.triggered.connect(lambda: self.navigate(key[7:]))
+        else:
+            menu.addAction("Open PDF", self.open_selected)
+            menu.addAction("Download a copy…", self.download_selected)
+            menu.addAction("Email via iMail", self.email_selected)
+        menu.exec(view.viewport().mapToGlobal(pos))
 
     def folder_changed(self, current, previous):
         if not self._navigating:
