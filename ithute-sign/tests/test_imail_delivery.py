@@ -44,7 +44,7 @@ def test_imail_rejects_plaintext_smtp(tmp_path):
 
 def test_imail_starttls_submission(tmp_path):
     pdf = tmp_path / "contract.pdf"
-    pdf.write_bytes(b"%PDF-1.7\\n" + b" " * 120)
+    pdf.write_bytes(b"%PDF-1.7\n" + b" " * 120)
     smtp = MagicMock()
     smtp.__enter__.return_value = smtp
     smtp.send_message.return_value = {}
@@ -60,7 +60,7 @@ def test_imail_starttls_submission(tmp_path):
 def test_imail_recipient_refusal_is_not_success(tmp_path):
     import smtplib
     pdf = tmp_path / "contract.pdf"
-    pdf.write_bytes(b"%PDF-1.7\\n" + b" " * 120)
+    pdf.write_bytes(b"%PDF-1.7\n" + b" " * 120)
     smtp = MagicMock()
     smtp.__enter__.return_value = smtp
     smtp.send_message.return_value = {"client@example.com": (550, b"rejected")}
@@ -71,10 +71,10 @@ def test_imail_recipient_refusal_is_not_success(tmp_path):
                             "client@example.com", pdf, "REF-3")
 
 
-@pytest.mark.parametrize("reference", ["REF\\nBcc: other@example.com", "REF\\tX", "REF\\x7f"])
+@pytest.mark.parametrize("reference", ["REF\nBcc: other@example.com", "REF\tX", "REF\x7f"])
 def test_imail_rejects_control_characters_in_reference(tmp_path, reference):
     pdf = tmp_path / "contract.pdf"
-    pdf.write_bytes(b"%PDF-1.7\\n" + b" " * 120)
+    pdf.write_bytes(b"%PDF-1.7\n" + b" " * 120)
     with patch("imail_delivery.smtplib.SMTP_SSL") as smtp:
         with pytest.raises(ValueError, match="contract reference"):
             send_signed_pdf("smtp.example.com", 465, "ssl",
