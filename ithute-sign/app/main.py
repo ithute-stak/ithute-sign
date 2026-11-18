@@ -28,6 +28,7 @@ from loanhub_auth import LoanHubLoginTransport
 from loanhub_presentation import employee_display_name
 from loanhub_loans_dialog import LoanHubLoansDialog
 from whatsapp_dialog import WhatsAppDeliveryDialog
+from imail_dialog import IMailDeliveryDialog
 
 def decorate_action(button, label):
     """Use native Qt icons so Linux and Windows need no extra icon packages."""
@@ -378,6 +379,11 @@ class Window(QMainWindow):
         whatsapp_button.setMinimumHeight(56)
         whatsapp_button.clicked.connect(self.send_signed_whatsapp)
         home.addWidget(whatsapp_button)
+        imail_button = QPushButton("Email signed PDF via iMail")
+        imail_button.setObjectName("quickAction")
+        imail_button.setMinimumHeight(56)
+        imail_button.clicked.connect(self.send_signed_imail)
+        home.addWidget(imail_button)
         home.addWidget(recent_heading)
         self.home_recent = QLabel("No documents opened yet")
         self.home_recent.setWordWrap(True)
@@ -1158,6 +1164,21 @@ class Window(QMainWindow):
             QMessageBox.information(self, "Saved", "Signed PDF saved:\\n" + signed_pdf)
         except Exception as exc:
             QMessageBox.critical(self, "Save failed", str(exc))
+    def send_signed_imail(self):
+        if not self.last_signed_pdf or not Path(self.last_signed_pdf).is_file():
+            QMessageBox.warning(self, "iMail", "Save a signed PDF before emailing.")
+            return
+        if self.last_signed_source != self.source:
+            QMessageBox.warning(self, "iMail", "The signed PDF belongs to another document.")
+            return
+        try:
+            if sha256(self.last_signed_pdf) != self.last_signed_pdf_digest:
+                raise ValueError("Signed PDF changed after saving. Sign and save again.")
+        except (OSError, ValueError) as exc:
+            QMessageBox.warning(self, "iMail", str(exc))
+            return
+        IMailDeliveryDialog(self.last_signed_pdf, self).exec()
+
     def send_signed_whatsapp(self):
         if not self.last_signed_pdf or not Path(self.last_signed_pdf).is_file():
             QMessageBox.warning(self, "WhatsApp", "Save a signed PDF before sending.")
