@@ -80,16 +80,10 @@ def inspect_loanhub_signatures(pdf):
     pending = detect_loanhub(pdf)
     roles = {field.role for field in pending}
     page = pdf[6]
-    record_rects = {
-        "Borrower": fitz.Rect(349, 231, 394, 247),
-        "Lender": fitz.Rect(349, 366, 394, 383),
-    }
-    records = {}
-    for label, rect in record_rects.items():
-        value = page.get_textbox(rect).strip()
-        if value not in ("SIGNED", "PENDING"):
-            raise ValueError("Unrecognized " + label + " record status")
-        records[label] = value
+    # The printed record labels are not cryptographic or handwritten proof.
+    # Avoid guessing their locations from unrelated execution coordinates.
+    records = {"Borrower": "not independently verified",
+               "Lender": "not independently verified"}
     return {
         "pending_roles": tuple(field.role for field in pending),
         "record_status": records,
