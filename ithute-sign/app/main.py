@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QLabel, QPush
     QVBoxLayout, QHBoxLayout, QFileDialog, QMessageBox, QScrollArea, QSpinBox,
     QDialog, QDialogButtonBox, QListWidget, QProgressBar, QStackedWidget, QStyle, QInputDialog)
 from document import to_pdf, sign_pdf_many, Placement, sha256
+from local_login_dialog import LocalLoginDialog
 from device import probe_bridge, show_screen, validate_signature_png
 from geometry import fit_rectangle
 from loanhub import detect_loanhub, save_loanhub_signed
@@ -1254,7 +1255,11 @@ class Window(QMainWindow):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
+    login = LocalLoginDialog()
+    if login.exec() != QDialog.Accepted:
+        sys.exit(0)
     window = Window()
+    window.local_user = login.user
     window.show()
     # Explicit --open prevents accidental interpretation of Qt or other flags as paths.
     if len(sys.argv) == 3 and sys.argv[1] == "--open":
