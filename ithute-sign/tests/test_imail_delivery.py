@@ -20,6 +20,7 @@ def test_imail_ssl_submission(tmp_path):
     pdf.write_bytes(b"%PDF-1.7\n" + b" " * 120)
     smtp = MagicMock()
     smtp.__enter__.return_value = smtp
+    smtp.send_message.return_value = {}  # SMTP accepted all recipients
     with patch("imail_delivery.smtplib.SMTP_SSL", return_value=smtp) as factory:
         recipient = send_signed_pdf(
             "mail.example.com", 465, "ssl", "documents@batlokoa.co.ls",
