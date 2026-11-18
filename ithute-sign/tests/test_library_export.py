@@ -43,3 +43,25 @@ def test_export_rejects_tampered_archive(tmp_path, monkeypatch):
     archived.write_bytes(b"tampered")
     with pytest.raises(ValueError, match="integrity"):
         export_archived_pdf(record, path, tmp_path / "download.pdf")
+
+
+def test_exclusive_create_race_never_deletes_other_file(tmp_path, monkeypatch):
+    """Another writer wins between existence check and exclusive creation."""
+    monkeypatch.setenv("ITHUTESIGN_LIBRARY_DIR", str(tmp_path / "library"))
+    source = tmp_path / "contract.pdf"
+    source.write_bytes(b"%PDF-1.7\\n" + b"test" * 100)
+    archive_signed_pdf(source, national_id="123456789012")
+    record, path = list_signed_pdfs()[0]
+    destination = tmp_path / "race.pdf"
+    original_open = Path.open
+
+    def racing_open(self, mode="r", *args, **kwargs):
+        if self == destination and mode == "xb":
+            destination.write_bytes(b"another writer's document")
+            raise FileExistsError("Created by another process")
+        return original_open(self, mode, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", racing_open)
+    with pytest.raises(FileExistsError):
+        export_archived_pdf(record, path, destination)
+    assert destination.read_bytes() == b"another writer's document"
