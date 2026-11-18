@@ -132,3 +132,20 @@ def test_standalone_company_identity_is_tenant_bound(monkeypatch):
     with pytest.raises(HTTPException) as wrong_key:
         verify_standalone_identity("Bearer its_" + "y" * 48, company)
     assert wrong_key.value.status_code == 401
+
+
+def test_offline_registration_requires_confirmations():
+    from offline_registration import OfflineDocumentRegistration, validate_registration
+    from fastapi import HTTPException
+    payload = OfflineDocumentRegistration(
+        company_id=uuid4(), document_sha256="a" * 64,
+        recipient="26650123456", reference="CONTRACT-001",
+        consent_confirmed=True, signer_confirmed=True,
+    )
+    result = validate_registration(payload)
+    assert result["verified_signature"] is False
+    assert result["delivery_authorised"] is False
+    payload.consent_confirmed = False
+    with pytest.raises(HTTPException) as error:
+        validate_registration(payload)
+    assert error.value.status_code == 422
