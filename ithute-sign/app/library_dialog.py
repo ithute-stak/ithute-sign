@@ -500,15 +500,16 @@ class SignedLibraryDialog(QDialog):
             name = str(record.get("name") or "Document")
             national_id = str(record.get("national_id") or "Legacy / unassigned")
             created = str(record.get("created_at") or "Unknown").replace("T", " ")
-            QMessageBox.information(
-                self, "PDF properties",
-                f"Document: {name}\\nClient National ID: {national_id}\\n"
-                f"Saved: {created}\\nType: PDF\\n"
-                f"Size: {size:,} bytes\\n" if size is not None else
-                f"Document: {name}\\nClient National ID: {national_id}\\n"
-                f"Saved: {created}\\nType: PDF\\nSize: unavailable\\n"
+            size_text = f"{size:,} bytes" if size is not None else "Unavailable"
+            message = (
+                f"Document: {name}\\n"
+                f"Client National ID: {national_id}\\n"
+                f"Saved: {created}\\n"
+                f"Type: PDF\\n"
+                f"Size: {size_text}\\n"
                 f"Integrity: {integrity}"
             )
+            QMessageBox.information(self, "PDF properties", message)
             return
 
     def download_selected(self):
