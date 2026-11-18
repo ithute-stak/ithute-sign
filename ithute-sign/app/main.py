@@ -1020,6 +1020,12 @@ class Window(QMainWindow):
         try:
             self.page_index = 6
             self.redraw()
+            # Prepare the employee's authorized lender signature first, before
+            # asking anyone to sign on the Wacom tablet. This avoids confusing
+            # the employee with a borrower/witness capture screen at startup.
+            pending = sorted(pending, key=lambda field:
+                0 if field.role == "Lender execution" else
+                1 if field.role == "Borrower execution" else 2)
             for field in pending:
                 if field.role == "Lender execution" and getattr(self, "session_signature", None):
                     employee = getattr(self, "local_user", None)
