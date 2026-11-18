@@ -49,6 +49,9 @@ class SignedLibraryDialog(QDialog):
         for record, path in self.entries:
             self.groups[record.get("national_id") or "Legacy / unassigned"].append((record, path))
         self.active_folder = None
+        self.history = [None]
+        self.history_index = 0
+        self._navigating = False
         self.pdf_file_icon = pdf_icon()
         self.folder_icon = self.style().standardIcon(QStyle.SP_DirIcon)
         self.setWindowTitle("IthuteSign | Client Document Explorer")
@@ -78,6 +81,14 @@ class SignedLibraryDialog(QDialog):
         self.count = QLabel()
         header.addWidget(self.count)
         root.addLayout(header)
+        navigation = QHBoxLayout()
+        self.back_button = QPushButton("← Back")
+        self.home_button = QPushButton("⌂ Home")
+        self.up_button = QPushButton("↑ Up")
+        for button in (self.back_button, self.home_button, self.up_button):
+            navigation.addWidget(button)
+        navigation.addStretch()
+        root.addLayout(navigation)
         tools = QHBoxLayout()
         self.search = QLineEdit()
         self.search.setPlaceholderText("Search National ID, client folders, filenames or dates...")
@@ -126,7 +137,7 @@ class SignedLibraryDialog(QDialog):
                 widget.setResizeMode(QListWidget.Adjust)
                 widget.setMovement(QListWidget.Static)
                 widget.setSpacing(10)
-            widget.itemDoubleClicked.connect(self.open_selected)
+            widget.itemDoubleClicked.connect(self.activate_item)
             self.lists.append(widget)
             self.views.addWidget(widget)
         panel_layout.addWidget(self.views)
@@ -145,6 +156,9 @@ class SignedLibraryDialog(QDialog):
         footer.addWidget(self.close_button)
         root.addLayout(footer)
 
+        self.back_button.clicked.connect(self.go_back)
+        self.home_button.clicked.connect(lambda: self.navigate(None))
+        self.up_button.clicked.connect(lambda: self.navigate(None))
         self.search.textChanged.connect(self.refresh)
         self.folders.currentItemChanged.connect(self.folder_changed)
         self.list_button.clicked.connect(lambda: self.set_mode(0))
@@ -155,9 +169,42 @@ class SignedLibraryDialog(QDialog):
         self.refresh()
 
     def folder_changed(self, current, previous):
-        self.active_folder = current.data(0, Qt.UserRole) if current else None
-        self.breadcrumb.setText("IthuteSign  /  " + (self.active_folder or "All documents"))
+        if not self._navigating:
+            self.navigate(current.data(0, Qt.UserRole) if current else None)
+
+    def navigate(self, folder, record_history=True):
+        if folder is not None and folder not in self.groups:
+            return
+        if record_history and folder != self.active_folder:
+            self.history = self.history[:self.history_index + 1]
+            self.history.append(folder)
+            self.history_index += 1
+        self.active_folder = folder
+        self._navigating = True
+        try:
+            for index in range(self.folders.topLevelItemCount()):
+                item = self.folders.topLevelItem(index)
+                if item.data(0, Qt.UserRole) == folder:
+                    self.folders.setCurrentItem(item)
+                    break
+        finally:
+            self._navigating = False
+        self.breadcrumb.setText("IthuteSign  /  " + (folder or "Client folders"))
+        self.back_button.setEnabled(self.history_index > 0)
+        self.up_button.setEnabled(folder is not None)
         self.refresh()
+
+    def go_back(self):
+        if self.history_index > 0:
+            self.history_index -= 1
+            self.navigate(self.history[self.history_index], record_history=False)
+
+    def activate_item(self, item):
+        value = item.data(Qt.UserRole)
+        if isinstance(value, str) and value.startswith("folder:"):
+            self.navigate(value[7:])
+        else:
+            self.open_selected()
 
     def set_mode(self, index):
         old = self.current_record()
@@ -170,9 +217,20 @@ class SignedLibraryDialog(QDialog):
 
     def refresh(self, *_):
         query = self.search.text().casefold().strip()
+        folders = []
         shown = []
+        if self.active_folder is None:
+            for folder, documents in sorted(self.groups.items()):
+                if not query or query in folder.casefold() or any(
+                    query in str(record.get("name", "")).casefold()
+                    or query in str(record.get("created_at", "")).casefold()
+                    for record, _ in documents
+                ):
+                    folders.append((folder, len(documents)))
         for record, path in self.entries:
             folder = record.get("national_id") or "Legacy / unassigned"
+            if self.active_folder is None and not query:
+                continue
             if self.active_folder is not None and folder != self.active_folder:
                 continue
             haystack = " ".join((folder, record.get("name", ""), record.get("created_at", ""))).casefold()
@@ -181,20 +239,22 @@ class SignedLibraryDialog(QDialog):
             shown.append((record, path))
         for widget in self.lists:
             widget.clear()
+            for folder, count in folders:
+                label = folder + ("\\n" if widget.viewMode() == QListWidget.IconMode else "  |  ") + str(count) + " documents"
+                item = QListWidgetItem(self.folder_icon, label)
+                item.setData(Qt.UserRole, "folder:" + folder)
+                widget.addItem(item)
             for record, path in shown:
                 folder = record.get("national_id") or "Legacy / unassigned"
                 date = record.get("created_at", "")[:16].replace("T", " ")
-                if widget.viewMode() == QListWidget.IconMode:
-                    label = record.get("name", "Document") + "\n" + folder
-                else:
-                    label = record.get("name", "Document") + "     |     " + folder + "     |     " + date
-                item = QListWidgetItem(
-                    self.pdf_file_icon, label)
+                label = (record.get("name", "Document") + ("\\n" if widget.viewMode() == QListWidget.IconMode else "  |  ") +
+                         folder + ("" if widget.viewMode() == QListWidget.IconMode else "  |  " + date))
+                item = QListWidgetItem(self.pdf_file_icon, label)
                 item.setData(Qt.UserRole, record["id"])
-                item.setToolTip(f"Client: {folder}\nDocument: {record.get('name')}\nSaved: {date}")
+                item.setToolTip(f"Client: {folder}\\nDocument: {record.get('name')}\\nSaved: {date}")
                 widget.addItem(item)
         self.count.setText(f"{len(self.groups)} client folders  •  {len(self.entries)} documents")
-        self.status.setText(f"{len(shown)} documents shown")
+        self.status.setText(f"{len(folders)} folders  •  {len(shown)} documents shown")
 
     def current_record(self):
         item = self.lists[self.views.currentIndex()].currentItem()
@@ -202,6 +262,9 @@ class SignedLibraryDialog(QDialog):
 
     def selected_pdf(self):
         record_id = self.current_record()
+        if record_id and record_id.startswith("folder:"):
+            self.navigate(record_id[7:])
+            return None
         if not record_id:
             QMessageBox.warning(self, "Select document", "Select a saved PDF first.")
             return None
