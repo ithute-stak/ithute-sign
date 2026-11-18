@@ -6,7 +6,7 @@ re-captured or overwritten. Unsupported layouts fail closed.
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-import fitz
+import pymupdf as fitz
 
 @dataclass(frozen=True)
 class PendingField:
