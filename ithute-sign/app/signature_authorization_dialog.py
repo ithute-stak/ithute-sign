@@ -22,16 +22,7 @@ class SignatureAuthorizationDialog(QDialog):
             QFrame#card QLabel { color: #18344c; }
             QFrame#card QCheckBox { color: #18344c; font-size: 14px; font-weight: 600; }
             QFrame#card QCheckBox:disabled { color: #84919d; }
-            QFrame#card QCheckBox::indicator {
-                width: 23px; height: 23px; border: 2px solid #5b7286;
-                border-radius: 5px; background: white;
-            }
-            QFrame#card QCheckBox::indicator:checked {
-                background: #087e82; border: 2px solid #087e82;
-            }
-            QFrame#card QCheckBox::indicator:disabled {
-                background: #e4e9ee; border: 2px solid #b4bec8;
-            }
+            /* Keep native check indicators: Qt draws the actual tick. */
             QFrame#card QCheckBox:focus { color: #087e82; }
             QPushButton#approve { background: #087e82; color: white;
                 border-radius: 8px; padding: 11px; font-weight: 700; }
@@ -78,7 +69,7 @@ class SignatureAuthorizationDialog(QDialog):
             inner.addWidget(note)
         root.addWidget(card)
         self.attest = QCheckBox("I confirm my signing authority and witness attestation")
-        self.attest.setMinimumHeight(32)
+        self.attest.setMinimumHeight(32)\n        self.attest.setStyleSheet("QCheckBox { color: white; font-weight: 600; }")
         root.addWidget(self.attest)
         attestation_details = QLabel(
             "I am authorized for every selected role and personally witnessed "
