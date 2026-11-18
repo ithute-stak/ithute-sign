@@ -57,11 +57,14 @@ class SignatureAuthorizationDialog(QDialog):
             note.setStyleSheet("color: #667a8b; font-size: 11px; margin-left: 23px;")
             inner.addWidget(note)
         root.addWidget(card)
-        self.attest = QCheckBox(
-            "I confirm I am authorized for every selected role and personally "
-            "witnessed any event I am attesting to.")
-        self.attest.setWordWrap(True)
+        self.attest = QCheckBox("I confirm my signing authority and witness attestation")
         root.addWidget(self.attest)
+        attestation_details = QLabel(
+            "I am authorized for every selected role and personally witnessed "
+            "any signing event I am attesting to.")
+        attestation_details.setObjectName("subtitle")
+        attestation_details.setWordWrap(True)
+        root.addWidget(attestation_details)
         buttons = QHBoxLayout()
         cancel = QPushButton("Cancel")
         cancel.setObjectName("cancel")
