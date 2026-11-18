@@ -3,7 +3,7 @@ from collections import defaultdict
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QSize
-from PySide6.QtGui import QIcon, QPixmap, QPainter, QColor, QFont, QPen, QShortcut, QKeySequence
+from PySide6.QtGui import QIcon, QPixmap, QPainter, QColor, QFont, QPen, QShortcut, QKeySequence, QPalette
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
     QTreeWidget, QTreeWidgetItem, QListWidget, QListWidgetItem, QSplitter,
@@ -60,19 +60,47 @@ class SignedLibraryDialog(QDialog):
         self.folder_icon = self.style().standardIcon(QStyle.SP_DirIcon)
         self.setWindowTitle("IthuteSign | Client Document Explorer")
         self.setMinimumSize(850, 550)
+        palette = self.palette()
+        for role, color in (
+            (QPalette.Window, "#edf3f9"),
+            (QPalette.WindowText, "#142b46"),
+            (QPalette.Base, "#ffffff"),
+            (QPalette.AlternateBase, "#f3f7fc"),
+            (QPalette.Text, "#142b46"),
+            (QPalette.Highlight, "#d7ebff"),
+            (QPalette.HighlightedText, "#102d4b"),
+            (QPalette.Button, "#ffffff"),
+            (QPalette.ButtonText, "#17334f"),
+        ):
+            palette.setColor(role, QColor(color))
+        self.setPalette(palette)
         self.setStyleSheet("""
             QDialog { background: #edf3f9; color: #152b46; }
             QLabel { color: #152b46; background: transparent; }
             QLabel#header { color: #102943; font-size: 25px; font-weight: 800; }
-            QTreeWidget, QListWidget { background: #ffffff; color: #20364e;
-                border: 1px solid #cddae8; border-radius: 10px; padding: 9px;
-                font-size: 13px; }
-            QTreeWidget::item, QListWidget::item { padding: 9px; border-radius: 5px; }
-            QTreeWidget::item:hover, QListWidget::item:hover { background: #edf5ff; }
-            QTreeWidget::item:selected, QListWidget::item:selected {
-                background: #cde6fc; color: #0b3153; }
-            QHeaderView::section { background: #e0ebf6; color: #1b3551;
-                padding: 10px; border: none; font-weight: bold; }
+            QTreeWidget, QListWidget {
+                background-color: #ffffff; alternate-background-color: #f3f7fc;
+                color: #17324f; selection-background-color: #d7ebff;
+                selection-color: #102d4b; border: 1px solid #cddae8;
+                border-radius: 8px; font-size: 13px; }
+            QTreeWidget::item, QListWidget::item {
+                color: #17324f; padding: 8px 6px; border: none; }
+            QTreeWidget::item:hover, QListWidget::item:hover {
+                background-color: #e9f3ff; color: #102d4b; }
+            QTreeWidget::item:selected, QListWidget::item:selected,
+            QTreeWidget::item:selected:!active, QListWidget::item:selected:!active {
+                background-color: #d7ebff; color: #102d4b; }
+            QHeaderView { background-color: #e0ebf6; color: #17324f; }
+            QHeaderView::section {
+                background-color: #e0ebf6; color: #17324f;
+                padding: 9px 7px; border: none;
+                border-right: 1px solid #c5d5e5;
+                border-bottom: 1px solid #c5d5e5; font-weight: 700; }
+            QHeaderView::section:checked {
+                background-color: #d2e5f7; color: #102d4b; }
+            QMenu { background-color: #ffffff; color: #17324f;
+                border: 1px solid #cddae8; }
+            QMenu::item:selected { background-color: #d7ebff; color: #102d4b; }
             QLineEdit { background: white; color: #142b46; padding: 12px;
                 border: 1px solid #bacde0; border-radius: 9px; font-size: 13px; }
             QLineEdit:focus { border: 2px solid #168a9b; }
