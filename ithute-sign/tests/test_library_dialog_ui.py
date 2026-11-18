@@ -17,7 +17,7 @@ from library_dialog import SignedLibraryDialog
 def app():
     instance = QApplication.instance() or QApplication([])
     yield instance
-
+    # Release Qt-owned clipboard MIME data while QApplication is still alive.\n    # Otherwise some PySide6/Linux versions crash during interpreter shutdown.\n    from PySide6.QtGui import QGuiApplication\n    QGuiApplication.clipboard().clear()\n
 
 @pytest.fixture
 def explorer(tmp_path, monkeypatch, app):
