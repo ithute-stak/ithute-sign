@@ -22,6 +22,7 @@ from document import to_pdf, sign_pdf_many, Placement, sha256
 from local_login_dialog import LocalLoginDialog, default_user_db
 from local_users import LocalUsers
 from signature_vault import SignatureVault
+from signature_authorization_dialog import SignatureAuthorizationDialog
 from PySide6.QtWidgets import QLineEdit
 from device import probe_bridge, show_screen, validate_signature_png
 from geometry import fit_rectangle
@@ -1036,30 +1037,28 @@ class Window(QMainWindow):
                 "Borrower witness": fitz.Rect(400, 246, 539, 272),
                 "Lender witness": fitz.Rect(400, 383, 539, 410),
             }
+            selected_roles = set()
             if reusable and employee and enrolled:
+                options = []
+                expected = " ".join(employee["display_name"].split()).casefold()
                 for field in reusable:
                     if field.role in witness_name_boxes:
                         named = " ".join(self.doc[6].get_textbox(
                             witness_name_boxes[field.role]).split())
-                        expected = " ".join(employee["display_name"].split())
-                        if named.casefold() != expected.casefold():
-                            raise ValueError(
-                                field.role + " is assigned to '" + named +
-                                "', not the logged-in employee '" + expected +
-                                "'. Another witness must sign this field.")
-                roles = ", ".join(field.role for field in reusable)
-                answer = QMessageBox.question(
-                    self, "Confirm offline signing authority",
-                    "Apply the registered signature of " + employee["display_name"]
-                    + " to: " + roles + "?\n\n"
-                    "By confirming, you attest that you personally witnessed "
-                    "the events indicated by any witness fields and are authorized "
-                    "to sign any lender field. The borrower must sign separately.",
-                    QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
-                if answer != QMessageBox.Yes:
+                        eligible = named.casefold() == expected
+                        reason = ("Assigned witness: " + named + ". Confirm you personally witnessed this signing."
+                                  if eligible else "Assigned to " + named + "; cannot use this employee signature.")
+                    else:
+                        eligible = True
+                        reason = ("Only select if you have authority to execute for the lender. "
+                                  "The printed lender representative may be another person.")
+                    options.append((field.role, eligible, reason))
+                consent = SignatureAuthorizationDialog(employee["display_name"], options, self)
+                if consent.exec() != QDialog.Accepted:
                     return
+                selected_roles = consent.selected_roles
             for field in pending:
-                if field in reusable and employee and enrolled:
+                if field.role in selected_roles and employee and enrolled:
                     target = Path(self.temp.name) / ("loanhub_employee_" + uuid.uuid4().hex + ".png")
                     fd = os.open(str(target), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
                     with os.fdopen(fd, "wb") as out:
