@@ -55,3 +55,22 @@ Do not put these secrets into the desktop app or GitHub.
 
 Desktop uses ITHUTESIGN_DELIVERY_URL=https://your-approved-delivery-host.
 This endpoint is not yet deployed.
+
+
+## Standalone IthuteSign company identity (not yet enabled for sending)
+
+The delivery service can verify a single provisioned company identity without
+calling LoanHub. Provision ITHUTESIGN_COMPANY_ID as a UUID and
+ITHUTESIGN_API_KEY_SHA256 as the SHA-256 digest of a high-entropy random
+credential prefixed with `its_`. Store the original credential only in an
+approved secret store. Never commit or log it. This first version supports
+one standalone company identity per deployment; multi-company provisioning
+requires a proper tenant identity store and key rotation/revocation.
+
+A standalone credential only authenticates a company. It **does not prove**
+that the document is signed, that the recipient is authorised, or that the
+sender has permission to distribute it. The send endpoint therefore remains
+disabled regardless of which authentication method is used.
+
+Desktop standalone credential entry and secure storage are not implemented
+yet. Offline signing itself is unchanged and requires no login.
