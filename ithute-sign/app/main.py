@@ -1113,7 +1113,12 @@ class Window(QMainWindow):
             return
         target = Path(self.temp.name) / ("stored_" + uuid.uuid4().hex + ".png")
         try:
-            target.write_bytes(png)
+            # Create exclusively with owner-only permissions: no plaintext
+            # employee signature should be world-readable during PDF assembly.
+            fd = os.open(str(target), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+            with os.fdopen(fd, "wb") as signature_file:
+                signature_file.write(png)
+            del png
             validate_signature_png(target)
             placement = Placement(self.page_index, x, y, width, height, str(target))
             self.signatures.append(placement)
