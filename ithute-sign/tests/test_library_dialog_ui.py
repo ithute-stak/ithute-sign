@@ -85,3 +85,33 @@ def test_download_via_dialog_preserves_original(explorer, tmp_path, monkeypatch)
     explorer.download_selected()
     assert destination.read_bytes() == source.read_bytes()
     assert source.is_file()
+
+
+def test_copy_pdf_to_os_clipboard_uses_staged_copy(explorer):
+    from PySide6.QtGui import QGuiApplication
+    explorer.navigate("123456789012")
+    explorer.lists[0].setCurrentItem(explorer.lists[0].topLevelItem(0))
+    original = explorer.selected_pdf()
+    explorer.copy_selected()
+    mime = QGuiApplication.clipboard().mimeData()
+    assert mime.hasUrls()
+    assert len(mime.urls()) == 1
+    copied = Path(mime.urls()[0].toLocalFile())
+    assert copied != original
+    assert copied.read_bytes() == original.read_bytes()
+    assert copied.parent.name.startswith("ithutesign-copy-")
+    assert b"copy" in bytes(mime.data("x-special/gnome-copied-files"))
+    assert original.is_file()
+
+
+def test_tampered_pdf_cannot_be_copied(explorer, monkeypatch):
+    from PySide6.QtGui import QGuiApplication
+    explorer.navigate("123456789012")
+    explorer.lists[0].setCurrentItem(explorer.lists[0].topLevelItem(0))
+    original = explorer.selected_pdf()
+    original.write_bytes(b"tampered")
+    warnings = []
+    monkeypatch.setattr("library_dialog.QMessageBox.critical",
+                        lambda *args: warnings.append(args[2]))
+    explorer.copy_selected()
+    assert warnings
