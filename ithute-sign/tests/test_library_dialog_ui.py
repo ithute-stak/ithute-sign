@@ -17,7 +17,7 @@ from library_dialog import SignedLibraryDialog
 def app():
     instance = QApplication.instance() or QApplication([])
     yield instance
-    # Release Qt-owned clipboard MIME data while QApplication is still alive.\n    # Otherwise some PySide6/Linux versions crash during interpreter shutdown.\n    from PySide6.QtGui import QGuiApplication\n    QGuiApplication.clipboard().clear()\n
+    # Release Qt-owned clipboard MIME data while QApplication is still alive.\n    # Otherwise some PySide6/Linux versions crash during interpreter shutdown.\n    from PySide6.QtGui import QGuiApplication\n    QGuiApplication.clipboard().clear()\n    import gc\n    gc.collect()\n
 
 @pytest.fixture
 def explorer(tmp_path, monkeypatch, app):
@@ -31,7 +31,7 @@ def explorer(tmp_path, monkeypatch, app):
         archive_signed_pdf(source, national_id="123456789012")
     dialog = SignedLibraryDialog(lambda _: None)
     yield dialog
-    dialog.close()
+    dialog.close()\n    dialog.deleteLater()\n    app.processEvents()
 
 
 def test_folder_navigation_and_details_columns(explorer):
@@ -115,3 +115,15 @@ def test_tampered_pdf_cannot_be_copied(explorer, monkeypatch):
                         lambda *args: warnings.append(args[2]))
     explorer.copy_selected()
     assert warnings
+
+
+def test_explorer_uses_readable_light_palette(explorer):
+    from PySide6.QtGui import QPalette
+    from PySide6.QtCore import Qt
+    palette = explorer.palette()
+    assert palette.color(QPalette.Base).name() == "#ffffff"
+    assert palette.color(QPalette.AlternateBase).name() == "#f3f7fc"
+    assert palette.color(QPalette.Text).name() == "#142b46"
+    assert palette.color(QPalette.Highlight).name() == "#d7ebff"
+    assert palette.color(QPalette.HighlightedText).name() == "#102d4b"
+    assert "alternate-background-color: #f3f7fc" in explorer.styleSheet()
