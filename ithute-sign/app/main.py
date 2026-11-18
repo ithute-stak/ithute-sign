@@ -1159,9 +1159,6 @@ class Window(QMainWindow):
         except Exception as exc:
             QMessageBox.critical(self, "Save failed", str(exc))
     def send_signed_whatsapp(self):
-        if not self.loanhub_access_token or not self.loanhub_company:
-            QMessageBox.warning(self, "WhatsApp", "Sign in and verify your company first.")
-            return
         if not self.last_signed_pdf or not Path(self.last_signed_pdf).is_file():
             QMessageBox.warning(self, "WhatsApp", "Save a signed PDF before sending.")
             return
