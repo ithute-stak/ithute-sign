@@ -1,0 +1,45 @@
+name: Offline LoanHub Signing Safety
+
+on:
+  push:
+    branches:
+      - feat/linux-stu540-java-bridge-20261117
+    paths:
+      - "ithute-sign/app/loanhub.py"
+      - "ithute-sign/app/main.py"
+      - "ithute-sign/app/loanhub_preflight_dialog.py"
+      - "ithute-sign/app/signature_authorization_dialog.py"
+      - "ithute-sign/tests/test_loanhub_signing_safety.py"
+      - ".github/workflows/loanhub-signing-safety.yml"
+  pull_request:
+    paths:
+      - "ithute-sign/app/loanhub.py"
+      - "ithute-sign/app/main.py"
+      - "ithute-sign/app/loanhub_preflight_dialog.py"
+      - "ithute-sign/app/signature_authorization_dialog.py"
+      - "ithute-sign/tests/test_loanhub_signing_safety.py"
+      - ".github/workflows/loanhub-signing-safety.yml"
+  workflow_dispatch:
+
+jobs:
+  signing-regression:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ithute-sign
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+      - name: Compile offline signing modules
+        run: |
+          python -m py_compile app/main.py app/loanhub.py app/loanhub_preflight_dialog.py app/signature_authorization_dialog.py
+      - name: Run offline LoanHub signing safety tests
+        run: python -m unittest discover -s tests -p 'test_loanhub_signing_safety.py' -v
