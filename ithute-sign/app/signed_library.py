@@ -10,8 +10,8 @@ from pathlib import Path
 import fitz
 from document import sha256
 
-ID_LABEL = re.compile(r"(?i)\\b(?:national\\s*(?:id|identity)(?:\\s*(?:number|no\\.?))?|identity\\s*(?:number|no\\.?)|id\\s*(?:number|no\\.?))\\s*[:#-]?\\s*([A-Za-z0-9][A-Za-z0-9 /-]{4,28})")
-ID_SAFE = re.compile(r"[A-Za-z0-9][A-Za-z0-9-]{4,31}\\Z")
+ID_LABEL = re.compile(r"(?i)\b(?:national\s*(?:id|identity)(?:\s*(?:number|no\.?))?|identity\s*(?:number|no\.?)|id\s*(?:number|no\.?))\s*[:#-]?\s*([A-Za-z0-9][A-Za-z0-9 /-]{4,28})")
+ID_SAFE = re.compile(r"[A-Za-z0-9][A-Za-z0-9-]{4,31}\Z")
 
 
 def library_root():
@@ -20,7 +20,7 @@ def library_root():
 
 
 def normalize_national_id(value):
-    value = re.sub(r"\\s+", "", value.strip()).upper()
+    value = re.sub(r"\s+", "", value.strip()).upper()
     if not ID_SAFE.fullmatch(value) or value in {"UNKNOWN", "NOTAVAILABLE"}:
         raise ValueError("Enter a valid National ID (letters, digits or hyphens)")
     return value
