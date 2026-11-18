@@ -108,7 +108,8 @@ def test_copy_pdf_to_os_clipboard_uses_staged_copy(explorer):
     assert copied != original
     assert copied.read_bytes() == original.read_bytes()
     assert copied.parent.name.startswith("ithutesign-copy-")
-    assert b"copy" in bytes(mime.data("x-special/gnome-copied-files"))
+    expected = ("copy\n" + mime.urls()[0].toString()).encode("utf-8")
+    assert bytes(mime.data("x-special/gnome-copied-files")) == expected
     assert original.is_file()
 
 
