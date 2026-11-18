@@ -7,7 +7,7 @@ from PySide6.QtGui import QIcon, QPixmap, QPainter, QColor, QFont, QPen
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
     QTreeWidget, QTreeWidgetItem, QListWidget, QListWidgetItem, QSplitter,
-    QWidget, QStackedWidget, QMessageBox, QStyle, QAbstractItemView, QFileDialog,
+    QWidget, QStackedWidget, QMessageBox, QStyle, QAbstractItemView, QFileDialog, QComboBox,
 )
 
 from signed_library import list_signed_pdfs, verify_archived_pdf
@@ -107,6 +107,10 @@ class SignedLibraryDialog(QDialog):
         self.search.setPlaceholderText("Search National ID, client folders, filenames or dates...")
         self.search.setClearButtonEnabled(True)
         tools.addWidget(self.search, 1)
+        self.sort_choice = QComboBox()
+        self.sort_choice.addItems(["Newest first", "Oldest first", "Name A-Z", "Name Z-A", "Largest first", "Smallest first"])
+        self.sort_choice.setStyleSheet("QComboBox { background: white; color: #17334f; padding: 9px; border: 1px solid #c5d5e5; }")
+        tools.addWidget(self.sort_choice)
         self.list_button = QPushButton("☰  List")
         self.tile_button = QPushButton("▦  Tiles")
         tools.addWidget(self.list_button)
@@ -183,6 +187,7 @@ class SignedLibraryDialog(QDialog):
         self.home_button.clicked.connect(lambda: self.navigate(None))
         self.up_button.clicked.connect(lambda: self.navigate(None))
         self.search.textChanged.connect(self.refresh)
+        self.sort_choice.currentIndexChanged.connect(self.refresh)
         self.folders.currentItemChanged.connect(self.folder_changed)
         self.list_button.clicked.connect(lambda: self.set_mode(0))
         self.tile_button.clicked.connect(lambda: self.set_mode(1))
@@ -264,6 +269,14 @@ class SignedLibraryDialog(QDialog):
             if query and query not in haystack:
                 continue
             shown.append((record, path))
+        sort_index = self.sort_choice.currentIndex()
+        if sort_index in (0, 1):
+            shown.sort(key=lambda pair: str(pair[0].get("created_at", "")), reverse=sort_index == 0)
+        elif sort_index in (2, 3):
+            shown.sort(key=lambda pair: str(pair[0].get("name", "")).casefold(), reverse=sort_index == 3)
+        else:
+            shown.sort(key=lambda pair: pair[1].stat().st_size if pair[1].exists() else 0,
+                       reverse=sort_index == 4)
         for widget in self.lists:
             widget.clear()
             for folder, count in folders:
@@ -274,8 +287,12 @@ class SignedLibraryDialog(QDialog):
             for record, path in shown:
                 folder = record.get("national_id") or "Legacy / unassigned"
                 date = record.get("created_at", "")[:16].replace("T", " ")
+                try:
+                    size_kb = (path.stat().st_size + 1023) // 1024
+                except OSError:
+                    size_kb = 0
                 label = (record.get("name", "Document") + ("\\n" if widget.viewMode() == QListWidget.IconMode else "  |  ") +
-                         folder + ("" if widget.viewMode() == QListWidget.IconMode else "  |  " + date))
+                         folder + ("" if widget.viewMode() == QListWidget.IconMode else "  |  " + date + "  |  " + str(size_kb) + " KB"))
                 item = QListWidgetItem(self.pdf_file_icon, label)
                 item.setData(Qt.UserRole, record["id"])
                 item.setToolTip(f"Client: {folder}\\nDocument: {record.get('name')}\\nSaved: {date}")
