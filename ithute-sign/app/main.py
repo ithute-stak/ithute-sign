@@ -12,7 +12,7 @@ import os
 from datetime import datetime
 from dataclasses import replace
 from pathlib import Path
-import fitz
+import pymupdf as fitz
 from PySide6.QtCore import Qt, QRectF
 from PySide6.QtGui import QPixmap, QImage, QPainter, QPen, QColor
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QLabel, QPushButton,
