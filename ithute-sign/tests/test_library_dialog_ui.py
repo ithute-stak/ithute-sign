@@ -150,3 +150,12 @@ def test_copy_shortcut_is_scoped_to_document_lists(explorer):
     assert {shortcut.parent() for shortcut in copy_shortcuts} == set(explorer.lists)
     assert all(shortcut.context() == Qt.WidgetWithChildrenShortcut
                for shortcut in copy_shortcuts)
+
+
+def test_document_header_fills_available_width_and_alternate_rows_are_light(explorer):
+    from PySide6.QtWidgets import QTreeWidget
+    details = next(view for view in explorer.lists if isinstance(view, QTreeWidget))
+    assert details.header().stretchLastSection()
+    assert details.alternatingRowColors()
+    assert "QTreeWidget::item:alternate" in explorer.styleSheet()
+    assert "background-color: #f3f7fc" in explorer.styleSheet()
