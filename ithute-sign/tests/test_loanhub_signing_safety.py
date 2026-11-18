@@ -7,11 +7,12 @@ import tempfile
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
+from unittest.mock import patch
 
 import pymupdf as fitz
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "app"))
-from loanhub import detect_loanhub, inspect_loanhub_signatures, save_loanhub_signed
+from loanhub import PendingField, detect_loanhub, inspect_loanhub_signatures, save_loanhub_signed
 
 
 class LoanHubSigningSafetyTests(unittest.TestCase):
@@ -54,6 +55,39 @@ class LoanHubSigningSafetyTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             save_loanhub_signed(self.source, self.output, [])
         self.assertEqual(self.output.read_bytes(), b"DO NOT OVERWRITE")
+
+    def test_synthetic_pdf_signature_round_trip(self):
+        """Exercise real PDF writing and reopening without a real customer contract.
+
+        Only template detection is mocked; image insertion, PDF serialization,
+        verification, and preservation of other pages execute normally.
+        """
+        signature = self.root / "synthetic-signature.png"
+        pixmap = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 120, 40), False)
+        pixmap.clear_with(0x222222)
+        pixmap.save(str(signature))
+        field = PendingField(
+            "Borrower execution", 6, (57.6, 516.0, 239.0, 533.8),
+            None, None, None)
+        original = self.source.read_bytes()
+        with patch("loanhub.detect_loanhub", return_value=[field]):
+            result = save_loanhub_signed(
+                self.source, self.output,
+                [(field, str(signature), datetime.now(timezone.utc), "Wacom STU-540")])
+        self.assertEqual(result, str(self.output.resolve()))
+        self.assertEqual(self.source.read_bytes(), original)
+        with fitz.open(self.source) as before, fitz.open(self.output) as after:
+            self.assertEqual(len(after), 8)
+            self.assertEqual(
+                [before[i].get_text() for i in range(8) if i != 6],
+                [after[i].get_text() for i in range(8) if i != 6])
+            region = fitz.Rect(*field.box)
+            self.assertTrue(any(
+                block.get("type") == 1 and fitz.Rect(block["bbox"]).intersects(region)
+                for block in after[6].get_text("dict")["blocks"]))
+            self.assertFalse(any(
+                block.get("type") == 1 and fitz.Rect(block["bbox"]).intersects(region)
+                for block in before[6].get_text("dict")["blocks"]))
 
     def test_source_is_never_overwritten(self):
         original = self.source.read_bytes()
