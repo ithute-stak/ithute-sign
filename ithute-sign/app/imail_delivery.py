@@ -38,8 +38,10 @@ def send_signed_pdf(host, port, security, username, password, recipient, pdf_pat
     if username.strip().lower() != SENDER or not password:
         raise ValueError("Authenticate with the documents@batlokoa.co.ls mailbox")
     recipient = validate_recipient(recipient)
+    if any(ord(c) < 32 or ord(c) == 127 for c in reference):
+        raise ValueError("Enter a valid contract reference")
     reference = reference.strip()
-    if not reference or len(reference) > 100 or any(ord(c) < 32 or ord(c) == 127 for c in reference):
+    if not reference or len(reference) > 100:
         raise ValueError("Enter a valid contract reference")
     path = Path(pdf_path)
     if not path.is_file() or path.suffix.lower() != ".pdf":
