@@ -24,6 +24,7 @@ from urllib.parse import urlparse
 import httpx
 from fastapi import FastAPI, HTTPException, Header, Request
 from pydantic import BaseModel, Field
+from standalone_identity import verify_standalone_identity
 
 app = FastAPI(title="IthuteSign WhatsApp Delivery", docs_url=None, redoc_url=None)
 DATABASE = Path(os.environ.get("DELIVERY_DATABASE", "/var/lib/ithutesign-delivery/delivery.sqlite3"))
@@ -87,7 +88,10 @@ async def verify_loanhub(token, company_id):
 async def send_contract(payload: ContractRequest, authorization: str = Header(default="")):
     if not authorization.startswith("Bearer ") or len(authorization) > 8192:
         raise HTTPException(401, "LoanHub bearer token required")
-    actor = await verify_loanhub(authorization[7:], payload.company_id)
+    if authorization.startswith("Bearer ") and authorization[7:].startswith("its_"):
+        actor = verify_standalone_identity(authorization, payload.company_id)
+    else:
+        actor = await verify_loanhub(authorization[7:], payload.company_id)
     try:
         data = base64.b64decode(payload.pdf_base64, validate=True)
     except (ValueError, Exception):
@@ -162,7 +166,10 @@ async def delivery_status(delivery_id: uuid.UUID, authorization: str = Header(de
             (str(delivery_id),)).fetchone()
     if not row:
         raise HTTPException(404, "Delivery not found")
-    actor = await verify_loanhub(authorization[7:], row[0])
+    if authorization[7:].startswith("its_"):
+        actor = verify_standalone_identity(authorization, uuid.UUID(row[0]))
+    else:
+        actor = await verify_loanhub(authorization[7:], row[0])
     if actor != row[1]:
         raise HTTPException(403, "Delivery belongs to another employee")
     return {"delivery_id": str(delivery_id), "status": row[2]}
