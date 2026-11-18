@@ -12,7 +12,8 @@ class SignatureAuthorizationDialog(QDialog):
         self.setMinimumWidth(560)
         self.setMinimumHeight(460)
         self.selected_roles = set()
-        self.checks = {}\n        self.selection_labels = {}
+        self.checks = {}
+        self.selection_labels = {}
         self.setStyleSheet("""
             QDialog { background: #102137; color: #eaf3f8; }
             QLabel#heading { font-size: 22px; font-weight: 800; color: white; }
@@ -76,7 +77,8 @@ class SignatureAuthorizationDialog(QDialog):
             note.setStyleSheet("color: #667a8b; font-size: 11px; margin-left: 23px;")
             inner.addWidget(note)
         root.addWidget(card)
-        self.attest = QCheckBox("I confirm my signing authority and witness attestation")\n        self.attest.setMinimumHeight(32)
+        self.attest = QCheckBox("I confirm my signing authority and witness attestation")
+        self.attest.setMinimumHeight(32)
         root.addWidget(self.attest)
         attestation_details = QLabel(
             "I am authorized for every selected role and personally witnessed "
