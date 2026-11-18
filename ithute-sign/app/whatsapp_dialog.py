@@ -20,7 +20,16 @@ class WhatsAppDeliveryDialog(QDialog):
         title = QLabel("Send signed contract")
         title.setStyleSheet("font-size: 22px; font-weight: 700;")
         layout.addWidget(title)
-        layout.addWidget(QLabel("Company: " + str(company["name"])))
+        if company:
+            layout.addWidget(QLabel("Company: " + str(company["name"])))
+        else:
+            note = QLabel(
+                "Offline-signed document. Signing does not require LoanHub. "
+                "Automatic WhatsApp delivery is not yet available for standalone "
+                "documents until independent service authentication is configured."
+            )
+            note.setWordWrap(True)
+            layout.addWidget(note)
         layout.addWidget(QLabel("Document: " + Path(pdf_path).name))
         layout.addWidget(QLabel("Client WhatsApp number"))
         self.number = QLineEdit()
@@ -35,6 +44,9 @@ class WhatsAppDeliveryDialog(QDialog):
         actions = QHBoxLayout()
         self.send = QPushButton("Send via WhatsApp")
         self.send.clicked.connect(self.submit)
+        if not token or not company:
+            self.send.setEnabled(False)
+            self.send.setToolTip("Standalone delivery requires a separate authenticated business account")
         actions.addWidget(self.send)
         self.check = QPushButton("Check delivery status")
         self.check.setEnabled(False)
