@@ -771,7 +771,7 @@ class Window(QMainWindow):
         if len(captured) != len(pending):
             return False
         expected = {field.role for field in pending}
-        if len(expected) != len(pending) or {field.role for field, _, _ in captured} != expected:
+        if len(expected) != len(pending) or {field.role for field, _, _, _ in captured} != expected:
             return False
         popup = QDialog(self)
         popup.setWindowTitle("IthuteSign — Review before saving")
@@ -797,7 +797,7 @@ class Window(QMainWindow):
         note.setWordWrap(True)
         note.setObjectName("reviewNote")
         body.addWidget(note)
-        for field, png, accepted in captured:
+        for field, png, accepted, method in captured:
             validate_signature_png(png)
             row = QHBoxLayout()
             details = QVBoxLayout()
@@ -1090,7 +1090,7 @@ class Window(QMainWindow):
                     with os.fdopen(fd, "wb") as out:
                         out.write(enrolled)
                     validate_signature_png(target)
-                    captured.append((field, str(target), datetime.now().astimezone()))
+                    captured.append((field, str(target), datetime.now().astimezone(), "Stored employee signature"))
                     continue
                 if not self.show_loanhub_progress(
                         pending, [entry[0].role for entry in captured],
@@ -1102,7 +1102,7 @@ class Window(QMainWindow):
                 target = Path(self.temp.name) / ("loanhub_" + uuid.uuid4().hex + ".png")
                 dialog.export(target)
                 validate_signature_png(target)
-                captured.append((field, str(target), datetime.now().astimezone()))
+                captured.append((field, str(target), datetime.now().astimezone(), "Wacom STU-540"))
             if not self.review_loanhub_signatures(pending, captured):
                 return
             if sha256(self.source) != self.source_digest:
