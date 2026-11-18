@@ -17,10 +17,16 @@ def export_archived_pdf(record, source, destination):
     if target.exists():
         raise FileExistsError("Export destination already exists")
     # Exclusive create protects against accidental overwrites.
+    created = False
     try:
-        with verified.open("rb") as source_file, target.open("xb") as destination_file:
-            shutil.copyfileobj(source_file, destination_file)
+        with target.open("xb") as destination_file:
+            created = True
+            with verified.open("rb") as source_file:
+                shutil.copyfileobj(source_file, destination_file)
     except BaseException:
-        target.unlink(missing_ok=True)
+        # Only remove a partial file that this call actually created.
+        # An exclusive-open failure must never delete someone else's file.
+        if created:
+            target.unlink(missing_ok=True)
         raise
     return target
