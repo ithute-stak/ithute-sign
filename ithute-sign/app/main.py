@@ -1179,6 +1179,7 @@ class Window(QMainWindow):
                     if answer != QMessageBox.Yes:
                         return
                 vault.enroll(user["id"], password, target)
+                self.session_signature = target.read_bytes()
             finally:
                 vault.close()
             QMessageBox.information(self, "Signature enrolled",
@@ -1383,6 +1384,7 @@ class Window(QMainWindow):
 
     def closeEvent(self, event):
         self.logout_loanhub()
+        self.session_signature = None
         if self.doc is not None:
             self.doc.close()
         self.temp.cleanup()
@@ -1396,6 +1398,8 @@ if __name__ == "__main__":
         sys.exit(0)
     window = Window()
     window.local_user = login.user
+    window.session_signature = login.unlocked_signature
+    login.unlocked_signature = None
     window.show()
     # Explicit --open prevents accidental interpretation of Qt or other flags as paths.
     if len(sys.argv) == 3 and sys.argv[1] == "--open":
