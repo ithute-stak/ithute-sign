@@ -85,7 +85,7 @@ class SignedLibraryDialog(QDialog):
                 border-radius: 8px; font-size: 13px; }
             QTreeWidget::item, QListWidget::item {
                 color: #17324f; padding: 8px 6px; border: none; }
-            QTreeWidget::item:hover, QListWidget::item:hover {
+            QTreeWidget::item:alternate, QListWidget::item:alternate {\n                background-color: #f3f7fc; color: #17324f; }\n            QTreeWidget::item:hover, QListWidget::item:hover {
                 background-color: #e9f3ff; color: #102d4b; }
             QTreeWidget::item:selected, QListWidget::item:selected,
             QTreeWidget::item:selected:!active, QListWidget::item:selected:!active {
@@ -180,7 +180,7 @@ class SignedLibraryDialog(QDialog):
         details.setSelectionMode(QAbstractItemView.SingleSelection)
         details.setIconSize(QSize(24, 24))
         details.header().setSectionResizeMode(QHeaderView.Interactive)
-        details.header().setStretchLastSection(False)
+        details.header().setStretchLastSection(True)
         for column, width in enumerate((245, 155, 145, 70, 90)):
             details.setColumnWidth(column, width)
         details.header().sectionClicked.connect(self.sort_by_column)
