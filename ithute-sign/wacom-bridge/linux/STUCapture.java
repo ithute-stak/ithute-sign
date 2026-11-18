@@ -109,12 +109,12 @@ public final class STUCapture {
             Color[] colors = {new Color(16, 51, 82), new Color(115, 49, 49), new Color(24, 125, 78)};
             for (int i = 0; i < 3; i++) {
                 int x = i * screenWidth / 3;
-                int right = (i + 1) * screenWidth / 3;
-                g.setColor(colors[i]); g.fillRect(x + 2, top, right - x - 4, screenHeight - top);
+                int buttonRight = (i + 1) * screenWidth / 3;
+                g.setColor(colors[i]); g.fillRect(x + 2, top, buttonRight - x - 4, screenHeight - top);
                 g.setColor(Color.WHITE);
                 g.setFont(new Font("SansSerif", Font.BOLD, Math.max(13, screenHeight / 18)));
                 FontMetrics fm = g.getFontMetrics();
-                g.drawString(labels[i], x + (right - x - fm.stringWidth(labels[i])) / 2,
+                g.drawString(labels[i], x + (buttonRight - x - fm.stringWidth(labels[i])) / 2,
                     top + (screenHeight - top + fm.getAscent()) / 2 - 3);
             }
         } finally { g.dispose(); }
