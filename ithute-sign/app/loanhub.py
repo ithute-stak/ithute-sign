@@ -106,32 +106,38 @@ def _replace_text(page, rect, value, fontsize=8, color=(0.09, 0.22, 0.35)):
                         color=color, align=fitz.TEXT_ALIGN_LEFT)
 
 def save_loanhub_signed(source, destination, captured):
-    """captured: sequence of (PendingField, png_path, accepted_datetime)."""
+    """captured: (field, png, timestamp, method) with an explicit method."""
+    if any(len(entry) != 4 for entry in captured):
+        raise ValueError("Every signature must specify its capture method")
+    if any(entry[3] not in ("Stored employee signature", "Wacom STU-540") for entry in captured):
+        raise ValueError("Unsupported signature capture method")
     source, destination = Path(source).resolve(), Path(destination).resolve()
     if source == destination or destination.exists() or destination.suffix.lower() != ".pdf":
         raise ValueError("Choose a new .pdf filename; original must remain unchanged")
     with fitz.open(source) as pdf:
         pending = detect_loanhub(pdf)
-        if len(pending) != len(captured) or {x.role for x in pending} != {x.role for x, _, _ in captured}:
+        if len(pending) != len(captured) or {x.role for x in pending} != {entry[0].role for entry in captured}:
             raise ValueError("Every pending field must be signed exactly once")
+        if len({entry[0].role for entry in captured}) != len(captured):
+            raise ValueError("Duplicate signature role")
         page = pdf[6]
         # Verify all images before modifying the document.
-        for field, png, accepted in captured:
+        for field, png, accepted, method in captured:
             if field not in pending or not Path(png).is_file() or accepted.tzinfo is None:
                 raise ValueError("Invalid signing capture")
             image = fitz.Pixmap(str(png))
             if image.width < 10 or image.height < 10:
                 raise ValueError("Invalid signature image")
-        for field, png, accepted in captured:
+        for field, png, accepted, method in captured:
             # White out only the existing placeholder underline, not the entire cell.
             page.add_redact_annot(fitz.Rect(*field.box), fill=(1, 1, 1))
         page.apply_redactions(images=0, graphics=0, text=0)
-        for field, png, accepted in captured:
+        for field, png, accepted, method in captured:
             page.insert_image(fitz.Rect(*field.box), filename=str(png), keep_proportion=True, overlay=True)
             if field.status is not None:
                 _replace_text(page, field.status, "SIGNED", fontsize=7)
                 _replace_text(page, field.date, accepted.strftime("%d %b %Y %H:%M %Z"), fontsize=6)
-                _replace_text(page, field.method, "Wacom STU-540", fontsize=7)
+                _replace_text(page, field.method, method, fontsize=6)
             else:
                 # Small timestamp stays inside the execution box, below the ink.
                 stamp = fitz.Rect(field.box[0], 534.2, field.box[2], 541.8)
@@ -151,7 +157,7 @@ def save_loanhub_signed(source, destination, captured):
             signed_page = verified[6]
             # Only validate the newly captured fields. Pre-existing signed
             # records are not proof of a handwritten signature.
-            for field, png, accepted in captured:
+            for field, png, accepted, method in captured:
                 rect = fitz.Rect(*field.box)
                 images = [block for block in signed_page.get_text("dict")["blocks"]
                           if block.get("type") == 1
@@ -166,7 +172,7 @@ def save_loanhub_signed(source, destination, captured):
                         raise ValueError("SIGNED status missing: " + field.role)
                     if "Pending" in signed_page.get_textbox(field.date):
                         raise ValueError("Pending date not replaced: " + field.role)
-                    if "Wacom STU-540" not in signed_page.get_textbox(field.method):
+                    if method not in signed_page.get_textbox(field.method):
                         raise ValueError("Capture method missing: " + field.role)
                 else:
                     stamp = fitz.Rect(field.box[0], 534.2, field.box[2], 541.8)
