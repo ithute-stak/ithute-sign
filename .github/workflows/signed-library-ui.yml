@@ -7,6 +7,7 @@ on:
     paths:
       - "ithute-sign/app/library_dialog.py"
       - "ithute-sign/app/library_export.py"
+      - "ithute-sign/app/library_clipboard.py"
       - "ithute-sign/app/pdf_preview.py"
       - "ithute-sign/app/signed_library.py"
       - "ithute-sign/tests/test_library_dialog_ui.py"
@@ -16,6 +17,7 @@ on:
     paths:
       - "ithute-sign/app/library_dialog.py"
       - "ithute-sign/app/library_export.py"
+      - "ithute-sign/app/library_clipboard.py"
       - "ithute-sign/app/pdf_preview.py"
       - "ithute-sign/app/signed_library.py"
       - "ithute-sign/tests/test_library_dialog_ui.py"
@@ -45,7 +47,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install PySide6 PyMuPDF pytest
       - name: Compile library modules
-        run: python -m py_compile app/library_dialog.py app/library_export.py app/pdf_preview.py app/signed_library.py
+        run: python -m py_compile app/library_dialog.py app/library_export.py app/library_clipboard.py app/pdf_preview.py app/signed_library.py
       - name: Validate Linux STU-540 launcher syntax
         run: bash -n wacom-bridge/linux/STUCapture
       - name: Run library regression tests
