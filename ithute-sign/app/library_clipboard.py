@@ -30,7 +30,7 @@ def copy_archived_pdf_to_clipboard(record, source):
         mime = QMimeData()
         mime.setUrls([url])
         # GNOME/Nautilus recognizes this as COPY, never MOVE.
-        mime.setData("x-special/gnome-copied-files", ("copy\\n" + url.toString()).encode("utf-8"))
+        mime.setData("x-special/gnome-copied-files", ("copy\n" + url.toString()).encode("utf-8"))
         clipboard.setMimeData(mime)
         # Retain the staged file for the application lifetime, including subsequent copies.
         _clipboard_staging.append(temporary)
