@@ -40,3 +40,32 @@ def test_imail_rejects_plaintext_smtp(tmp_path):
         send_signed_pdf("mail.example.com", 25, "none",
             "documents@batlokoa.co.ls", "password", "client@example.com",
             tmp_path / "missing.pdf", "REF")
+
+
+def test_imail_starttls_submission(tmp_path):
+    pdf = tmp_path / "contract.pdf"
+    pdf.write_bytes(b"%PDF-1.7\\n" + b" " * 120)
+    smtp = MagicMock()
+    smtp.__enter__.return_value = smtp
+    smtp.send_message.return_value = {}
+    with patch("imail_delivery.smtplib.SMTP", return_value=smtp) as factory:
+        send_signed_pdf("smtp.example.com", 587, "starttls",
+                        "documents@batlokoa.co.ls", "test-password",
+                        "client@example.com", pdf, "REF-2")
+    factory.assert_called_once()
+    smtp.starttls.assert_called_once()
+    smtp.login.assert_called_once_with("documents@batlokoa.co.ls", "test-password")
+
+
+def test_imail_recipient_refusal_is_not_success(tmp_path):
+    import smtplib
+    pdf = tmp_path / "contract.pdf"
+    pdf.write_bytes(b"%PDF-1.7\\n" + b" " * 120)
+    smtp = MagicMock()
+    smtp.__enter__.return_value = smtp
+    smtp.send_message.return_value = {"client@example.com": (550, b"rejected")}
+    with patch("imail_delivery.smtplib.SMTP_SSL", return_value=smtp):
+        with pytest.raises(smtplib.SMTPRecipientsRefused):
+            send_signed_pdf("smtp.example.com", 465, "ssl",
+                            "documents@batlokoa.co.ls", "test-password",
+                            "client@example.com", pdf, "REF-3")
