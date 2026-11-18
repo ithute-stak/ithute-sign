@@ -3,7 +3,7 @@ from collections import defaultdict
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QSize
-from PySide6.QtGui import QIcon
+from PySide6.QtGui import QIcon, QPixmap, QPainter, QColor, QFont, QPen
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
     QTreeWidget, QTreeWidgetItem, QListWidget, QListWidgetItem, QSplitter,
@@ -12,6 +12,30 @@ from PySide6.QtWidgets import (
 
 from signed_library import list_signed_pdfs, verify_archived_pdf
 from imail_dialog import IMailDeliveryDialog
+
+
+def pdf_icon(size=64):
+    """Draw a crisp PDF document icon without relying on desktop icon themes."""
+    pixmap = QPixmap(size, size)
+    pixmap.fill(Qt.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.Antialiasing)
+    scale = size / 64
+    painter.scale(scale, scale)
+    painter.setPen(QPen(QColor("#b7c7d8"), 1.5))
+    painter.setBrush(QColor("#ffffff"))
+    painter.drawRoundedRect(12, 4, 40, 54, 4, 4)
+    painter.setPen(Qt.NoPen)
+    painter.setBrush(QColor("#d73540"))
+    painter.drawRoundedRect(6, 31, 52, 23, 4, 4)
+    painter.setPen(QColor("#ffffff"))
+    font = QFont()
+    font.setBold(True)
+    font.setPixelSize(16)
+    painter.setFont(font)
+    painter.drawText(6, 31, 52, 23, Qt.AlignCenter, "PDF")
+    painter.end()
+    return QIcon(pixmap)
 
 
 class SignedLibraryDialog(QDialog):
@@ -25,6 +49,8 @@ class SignedLibraryDialog(QDialog):
         for record, path in self.entries:
             self.groups[record.get("national_id") or "Legacy / unassigned"].append((record, path))
         self.active_folder = None
+        self.pdf_file_icon = pdf_icon()
+        self.folder_icon = self.style().standardIcon(QStyle.SP_DirIcon)
         self.setWindowTitle("IthuteSign | Client Document Explorer")
         self.setMinimumSize(850, 550)
         self.setStyleSheet("""
@@ -72,11 +98,13 @@ class SignedLibraryDialog(QDialog):
         self.folders.setSelectionMode(QAbstractItemView.SingleSelection)
         all_item = QTreeWidgetItem(["All documents"])
         all_item.setData(0, Qt.UserRole, None)
+        all_item.setIcon(0, self.style().standardIcon(QStyle.SP_DirHomeIcon))
         self.folders.addTopLevelItem(all_item)
         self.folders.setCurrentItem(all_item)
         for national_id in sorted(self.groups):
             item = QTreeWidgetItem([national_id + "  (" + str(len(self.groups[national_id])) + ")"])
             item.setData(0, Qt.UserRole, national_id)
+            item.setIcon(0, self.folder_icon)
             self.folders.addTopLevelItem(item)
         splitter.addWidget(self.folders)
 
@@ -161,7 +189,7 @@ class SignedLibraryDialog(QDialog):
                 else:
                     label = record.get("name", "Document") + "     |     " + folder + "     |     " + date
                 item = QListWidgetItem(
-                    self.style().standardIcon(QStyle.SP_FileIcon), label)
+                    self.pdf_file_icon, label)
                 item.setData(Qt.UserRole, record["id"])
                 item.setToolTip(f"Client: {folder}\nDocument: {record.get('name')}\nSaved: {date}")
                 widget.addItem(item)
