@@ -48,6 +48,7 @@ public final class STUCapture {
             current = null;
             return;
         }
+        if (deviceControls && sy < screenHeight * 0.14) { current = null; return; }
         if (!down) { current = null; return; }
         if (current == null) { current = new ArrayList<>(); strokes.add(current); }
         current.add(new Point2D.Double(Math.max(0, Math.min(W - 1, data.getX() * (W - 1.0) / maxX)),
@@ -78,12 +79,31 @@ public final class STUCapture {
         BufferedImage img = new BufferedImage(screenWidth, screenHeight, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = img.createGraphics();
         try {
-            g.setColor(Color.WHITE); g.fillRect(0, 0, screenWidth, screenHeight);
-            g.setColor(new Color(16, 51, 82));
-            g.fillRect(0, 0, screenWidth, Math.max(32, screenHeight / 10));
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g.setColor(new Color(246, 249, 252)); g.fillRect(0, 0, screenWidth, screenHeight);
+            int headerHeight = (int)(screenHeight * 0.14);
+            g.setColor(new Color(16, 51, 82)); g.fillRect(0, 0, screenWidth, headerHeight);
             g.setColor(Color.WHITE);
-            g.setFont(new Font("SansSerif", Font.BOLD, Math.max(14, screenHeight / 20)));
-            g.drawString("ITHUTESIGN  -  Sign below", 16, Math.max(23, screenHeight / 15));
+            g.setFont(new Font("SansSerif", Font.BOLD, Math.max(17, screenHeight / 21)));
+            g.drawString("ITHUTESIGN", 20, Math.max(29, headerHeight / 2 + 7));
+            g.setFont(new Font("SansSerif", Font.PLAIN, Math.max(13, screenHeight / 30)));
+            String heading = "PLEASE SIGN BELOW";
+            FontMetrics headingMetrics = g.getFontMetrics();
+            g.drawString(heading, screenWidth - headingMetrics.stringWidth(heading) - 20, headerHeight / 2 + 6);
+            int left = 20, right = screenWidth - 20;
+            int upper = headerHeight + 18, lower = (int)(screenHeight * 0.83) - 16;
+            g.setColor(Color.WHITE);
+            g.fillRoundRect(left, upper, right - left, lower - upper, 14, 14);
+            g.setColor(new Color(188, 204, 217));
+            g.setStroke(new BasicStroke(2f));
+            g.drawRoundRect(left, upper, right - left, lower - upper, 14, 14);
+            g.setColor(new Color(146, 167, 183));
+            g.setStroke(new BasicStroke(1.5f));
+            int baseline = lower - 45;
+            g.drawLine(left + 35, baseline, right - 35, baseline);
+            g.setColor(new Color(72, 91, 110));
+            g.setFont(new Font("SansSerif", Font.PLAIN, Math.max(12, screenHeight / 34)));
+            g.drawString("Sign inside this area using the stylus", left + 34, upper + 26);
             int top = (int)(screenHeight * 0.83);
             String[] labels = {"CLEAR", "CANCEL", "ACCEPT"};
             Color[] colors = {new Color(16, 51, 82), new Color(115, 49, 49), new Color(24, 125, 78)};
@@ -343,7 +363,7 @@ public final class STUCapture {
                 return;
             }
             if (args.length != 1 || args[0].startsWith("--")) { System.err.println("Usage: STUCapture --probe | --idle | --welcome | --thanks | [--device-controls] output.png"); System.exit(12); }
-            try { new STUCapture().capture(Path.of(args[0])); }
+            try { STUCapture capture = new STUCapture(); capture.deviceControls = true; capture.capture(Path.of(args[0])); }
             finally { try { displayMessage(false); } catch (Exception e) { System.err.println("Idle screen unavailable: " + e.getMessage()); } }
         } catch (UnsatisfiedLinkError e) { System.err.println("Wacom native library unavailable: " + e); System.exit(11);
         } catch (Exception e) { System.err.println(e.getMessage()); System.exit(13); }
