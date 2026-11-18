@@ -29,6 +29,7 @@ from loanhub_presentation import employee_display_name
 from loanhub_loans_dialog import LoanHubLoansDialog
 from whatsapp_dialog import WhatsAppDeliveryDialog
 from imail_dialog import IMailDeliveryDialog
+from signed_library import archive_signed_pdf, list_signed_pdfs, verify_archived_pdf
 
 def decorate_action(button, label):
     """Use native Qt icons so Linux and Windows need no extra icon packages."""
@@ -287,7 +288,9 @@ class Window(QMainWindow):
         menu.addSpacing(22)
         for title, actions in (
             ("DOCUMENTS", (("Open PDF / Word", self.open_document),
-                           ("Auto-sign LoanHub", self.auto_sign_loanhub))),
+                           ("Auto-sign LoanHub", self.auto_sign_loanhub),
+                           ("Signed document library", self.open_signed_library),
+                           ("Email signed PDF via iMail", self.send_signed_imail))),
             ("SIGNATURES", (("Add signature", self.add_signature),
                             ("Reuse selected signature", self.reuse_selected_signature),
                             ("Remove selected", self.remove_selected))),
@@ -1158,12 +1161,66 @@ class Window(QMainWindow):
         try:
             signed_pdf = sign_pdf_many(self.preview_pdf, self.signatures, output,
                                        source_document=self.source)
-            self.last_signed_pdf = signed_pdf
-            self.last_signed_pdf_digest = sha256(signed_pdf)
+            archived_pdf = archive_signed_pdf(signed_pdf)
+            self.last_signed_pdf = str(archived_pdf)
+            self.last_signed_pdf_digest = sha256(archived_pdf)
             self.last_signed_source = self.source
-            QMessageBox.information(self, "Saved", "Signed PDF saved:\\n" + signed_pdf)
+            QMessageBox.information(self, "Saved", "Signed PDF saved and archived:\\n" + str(archived_pdf))
         except Exception as exc:
             QMessageBox.critical(self, "Save failed", str(exc))
+    def open_signed_library(self):
+        """Open or send an archived signed PDF without requiring the original."""
+        entries = list_signed_pdfs()
+        if not entries:
+            QMessageBox.information(self, "Signed document library",
+                                    "No archived signed PDFs yet. Sign and save a document first.")
+            return
+        dialog = QDialog(self)
+        dialog.setWindowTitle("IthuteSign — Signed document library")
+        dialog.resize(650, 420)
+        layout = QVBoxLayout(dialog)
+        layout.addWidget(QLabel("Saved signed documents (stored locally on this computer)"))
+        listing = QListWidget()
+        for record, _ in entries:
+            listing.addItem(record["created_at"][:16].replace("T", " ") + "  |  " + record["name"])
+        layout.addWidget(listing)
+        actions = QHBoxLayout()
+        open_button = QPushButton("Open PDF")
+        email_button = QPushButton("Email via iMail")
+        close_button = QPushButton("Close")
+        actions.addWidget(open_button)
+        actions.addWidget(email_button)
+        actions.addWidget(close_button)
+        layout.addLayout(actions)
+
+        def selected_pdf():
+            index = listing.currentRow()
+            if index < 0:
+                QMessageBox.warning(dialog, "Select document", "Select a saved document first.")
+                return None
+            record, path = entries[index]
+            try:
+                return verify_archived_pdf(record, path)
+            except (OSError, ValueError) as exc:
+                QMessageBox.critical(dialog, "Document integrity error", str(exc))
+                return None
+
+        def open_selected():
+            pdf = selected_pdf()
+            if pdf:
+                dialog.accept()
+                self.load_document(str(pdf))
+
+        def email_selected():
+            pdf = selected_pdf()
+            if pdf:
+                IMailDeliveryDialog(str(pdf), dialog).exec()
+
+        open_button.clicked.connect(open_selected)
+        email_button.clicked.connect(email_selected)
+        close_button.clicked.connect(dialog.reject)
+        dialog.exec()
+
     def send_signed_imail(self):
         if not self.last_signed_pdf or not Path(self.last_signed_pdf).is_file():
             QMessageBox.warning(self, "iMail", "Save a signed PDF before emailing.")
