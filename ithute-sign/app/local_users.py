@@ -5,14 +5,13 @@ LoanHub operations or reuse employee signatures without per-document consent.
 """
 from __future__ import annotations
 
-import hmac
 import os
 import sqlite3
 from pathlib import Path
 from uuid import uuid4
 
 from argon2 import PasswordHasher
-from argon2.exceptions import VerifyMismatchError, VerificationError
+from argon2.exceptions import VerifyMismatchError, VerificationError, InvalidHashError
 
 _HASHER = PasswordHasher(time_cost=3, memory_cost=65536, parallelism=2)
 _SCHEMA = """
@@ -68,7 +67,7 @@ class LocalUsers:
         try:
             if not _HASHER.verify(row[2], password):
                 return None
-        except (VerifyMismatchError, VerificationError):
+        except (VerifyMismatchError, VerificationError, InvalidHashError):
             return None
         return {"id": row[0], "username": row[1], "display_name": row[3]}
 
