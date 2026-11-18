@@ -192,9 +192,33 @@ async def webhook_status(request: Request, x_hub_signature_256: str = Header(def
                     state = status.get("status")
                     if state not in ("sent", "delivered", "read", "failed"):
                         continue
+                    message_id = status.get("id")
+                    if not isinstance(message_id, str) or not message_id:
+                        continue
+                    # Meta can retry webhooks or deliver them out of order.
+                    # Never regress read -> delivered -> sent -> accepted.
+                    rank = {"accepted": 0, "sent": 1, "delivered": 2, "read": 3}
                     with closing(database()) as db:
-                        db.execute("UPDATE deliveries SET state=?,updated_at=? WHERE meta_message_id=?",
-                            (state, int(time.time()), status.get("id")))
+                        row = db.execute(
+                            "SELECT state FROM deliveries WHERE meta_message_id=?",
+                            (message_id,)
+                        ).fetchone()
+                        if row is None:
+                            continue
+                        previous = row[0]
+                        if previous == "failed" or previous == "submission_failed":
+                            continue
+                        if state == "failed":
+                            if previous not in ("delivered", "read"):
+                                db.execute(
+                                    "UPDATE deliveries SET state=?,updated_at=? WHERE meta_message_id=?",
+                                    (state, int(time.time()), message_id)
+                                )
+                        elif rank.get(state, -1) > rank.get(previous, -1):
+                            db.execute(
+                                "UPDATE deliveries SET state=?,updated_at=? WHERE meta_message_id=?",
+                                (state, int(time.time()), message_id)
+                            )
                         db.commit()
     except (ValueError, TypeError, AttributeError):
         raise HTTPException(400, "Invalid webhook payload")
