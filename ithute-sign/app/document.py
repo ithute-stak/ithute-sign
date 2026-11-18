@@ -4,7 +4,10 @@ from dataclasses import dataclass
 from pathlib import Path
 import hashlib
 import os
-import fitz
+import shutil
+import subprocess
+import tempfile
+import pymupdf as fitz
 
 ALLOWED = {'.pdf', '.docx', '.doc'}
 
@@ -32,13 +35,36 @@ def to_pdf(path: str, destination: str) -> str:
         raise FileNotFoundError(source)
     if source.suffix.lower() == '.pdf':
         return str(source)
-    if os.name != 'nt':
-        raise RuntimeError('Word conversion requires Windows with Microsoft Word installed.')
-    import pythoncom
-    import win32com.client
     target = Path(destination).resolve()
     if target == source:
         raise ValueError('Conversion output cannot overwrite source')
+    if target.suffix.lower() != '.pdf':
+        raise ValueError('Conversion output must be a PDF')
+    if target.exists():
+        raise FileExistsError('Conversion output already exists')
+    if os.name != 'nt':
+        office = shutil.which('libreoffice') or shutil.which('soffice')
+        if not office:
+            raise RuntimeError('LibreOffice is required to convert Word documents on Ubuntu.')
+        with tempfile.TemporaryDirectory(prefix='ithutesign-convert-') as scratch:
+            scratch_dir = Path(scratch)
+            profile = (scratch_dir / 'profile').as_uri()
+            result = subprocess.run(
+                [office, '-env:UserInstallation=' + profile, '--headless',
+                 '--convert-to', 'pdf', '--outdir', str(scratch_dir), str(source)],
+                capture_output=True, text=True, timeout=90, check=False)
+            produced = scratch_dir / (source.stem + '.pdf')
+            if result.returncode != 0 or not produced.is_file() or produced.stat().st_size == 0:
+                raise RuntimeError('LibreOffice could not convert the document to PDF.')
+            with fitz.open(str(produced)) as verified:
+                if verified.needs_pass or len(verified) == 0:
+                    raise ValueError('Converted PDF is encrypted or empty')
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with target.open('xb') as out, produced.open('rb') as incoming:
+                shutil.copyfileobj(incoming, out)
+        return str(target)
+    import pythoncom
+    import win32com.client
     pythoncom.CoInitialize()
     word = None
     doc = None
