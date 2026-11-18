@@ -54,6 +54,7 @@ class SignedLibraryDialog(QDialog):
         self.history = [None]
         self.history_index = 0
         self._navigating = False
+        self._column_sort = None
         self.pdf_file_icon = pdf_icon()
         self.folder_icon = self.style().standardIcon(QStyle.SP_DirIcon)
         self.setWindowTitle("IthuteSign | Client Document Explorer")
@@ -204,7 +205,7 @@ class SignedLibraryDialog(QDialog):
         self.home_button.clicked.connect(lambda: self.navigate(None))
         self.up_button.clicked.connect(lambda: self.navigate(None))
         self.search.textChanged.connect(self.refresh)
-        self.sort_choice.currentIndexChanged.connect(self.refresh)
+        self.sort_choice.currentIndexChanged.connect(self.sort_from_dropdown)
         self.folders.currentItemChanged.connect(self.folder_changed)
         self.list_button.clicked.connect(lambda: self.set_mode(0))
         self.tile_button.clicked.connect(lambda: self.set_mode(1))
@@ -225,14 +226,18 @@ class SignedLibraryDialog(QDialog):
         self.refresh()
         self.navigate(None, record_history=False)
 
+    def sort_from_dropdown(self, *_):
+        self._column_sort = None
+        self.refresh()
+
     def sort_by_column(self, column):
-        """Keep both views in the same ordering after a header click."""
-        mapping = {0: (2, 3), 1: (2, 3), 2: (0, 1), 4: (4, 5)}
-        if column not in mapping:
+        """Sort by the actual clicked column, with numeric sizes and stable folders."""
+        if column not in (0, 1, 2, 3, 4):
             return
-        ascending, descending = mapping[column]
-        current = self.sort_choice.currentIndex()
-        self.sort_choice.setCurrentIndex(descending if current == ascending else ascending)
+        previous = self._column_sort
+        descending = previous is not None and previous[0] == column and not previous[1]
+        self._column_sort = (column, descending)
+        self.refresh()
 
     def show_document_menu(self, view, pos):
         """Actions operate on the item under the pointer, not stale selection."""
@@ -332,14 +337,37 @@ class SignedLibraryDialog(QDialog):
             if query and query not in haystack:
                 continue
             shown.append((record, path))
-        sort_index = self.sort_choice.currentIndex()
-        if sort_index in (0, 1):
-            shown.sort(key=lambda pair: str(pair[0].get("created_at", "")), reverse=sort_index == 0)
-        elif sort_index in (2, 3):
-            shown.sort(key=lambda pair: str(pair[0].get("name", "")).casefold(), reverse=sort_index == 3)
+        selected = self.current_record()
+        if self._column_sort is not None:
+            column, descending = self._column_sort
+            def column_key(pair):
+                record, path = pair
+                if column == 0:
+                    return str(record.get("name", "")).casefold()
+                if column == 1:
+                    return str(record.get("national_id") or "Legacy / unassigned").casefold()
+                if column == 2:
+                    return str(record.get("created_at", ""))
+                if column == 3:
+                    return "pdf"
+                try:
+                    return path.stat().st_size
+                except OSError:
+                    return -1
+            shown.sort(key=column_key, reverse=descending)
         else:
-            shown.sort(key=lambda pair: pair[1].stat().st_size if pair[1].exists() else 0,
-                       reverse=sort_index == 4)
+            sort_index = self.sort_choice.currentIndex()
+            if sort_index in (0, 1):
+                shown.sort(key=lambda pair: str(pair[0].get("created_at", "")), reverse=sort_index == 0)
+            elif sort_index in (2, 3):
+                shown.sort(key=lambda pair: str(pair[0].get("name", "")).casefold(), reverse=sort_index == 3)
+            else:
+                def file_size(pair):
+                    try:
+                        return pair[1].stat().st_size
+                    except OSError:
+                        return -1
+                shown.sort(key=file_size, reverse=sort_index == 4)
         for widget in self.lists:
             widget.clear()
             is_details = isinstance(widget, QTreeWidget)
@@ -374,7 +402,18 @@ class SignedLibraryDialog(QDialog):
                     widget.addItem(item)
         self.count.setText(f"{len(self.groups)} client folders  •  {len(self.entries)} documents")
         self.status.setText(f"{len(folders)} folders  •  {len(shown)} documents shown")
-        self.preview.clear()
+        if selected is not None:
+            for widget in self.lists:
+                if isinstance(widget, QTreeWidget):
+                    items = (widget.topLevelItem(i) for i in range(widget.topLevelItemCount()))
+                else:
+                    items = (widget.item(i) for i in range(widget.count()))
+                for item in items:
+                    if self.item_key(item) == selected:
+                        widget.setCurrentItem(item)
+                        break
+        if self.current_record() is None:
+            self.preview.clear()
 
     def preview_selection(self, current, previous):
         if self.views.currentWidget() not in self.lists:
