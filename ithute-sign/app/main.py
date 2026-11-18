@@ -1014,8 +1014,19 @@ class Window(QMainWindow):
             QMessageBox.warning(self, "LoanHub template not recognized", str(exc))
             return
         if not pending:
-            QMessageBox.information(self, "LoanHub", "No pending witness fields found.")
+            QMessageBox.information(self, "LoanHub", "No pending signature fields found.")
             return
+        # Offline borrower-only capture is not safe for templates that still
+        # require independent witness attestations. Never impersonate a witness.
+        witness_roles = [field.role for field in pending if "witness" in field.role.lower()]
+        if witness_roles:
+            QMessageBox.warning(
+                self, "Witness signatures required",
+                "This LoanHub contract still requires separate witness signatures: "
+                + ", ".join(witness_roles)
+                + ". These cannot be supplied automatically using the lender's "
+                  "stored signature. Use the existing guided signing workflow "
+                  "until witness authorization is configured.")
         captured = []
         try:
             self.page_index = 6
