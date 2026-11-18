@@ -357,22 +357,10 @@ class SignedLibraryDialog(QDialog):
             destination += ".pdf"
         target = Path(destination)
         if target.exists():
-            answer = QMessageBox.question(
+            QMessageBox.warning(
                 self, "File already exists",
-                "A file with this name already exists. Replace the downloaded copy?",
-                QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
-            if answer != QMessageBox.Yes:
-                return
-            # The protected archive is never a valid replacement target.
-            if target.resolve() == pdf.resolve():
-                QMessageBox.warning(self, "Protected document",
-                                    "The original IthuteSign archive cannot be overwritten.")
-                return
-            try:
-                target.unlink()
-            except OSError as exc:
-                QMessageBox.critical(self, "Download failed", str(exc))
-                return
+                "Choose another filename. IthuteSign will not overwrite an existing PDF.")
+            return
         try:
             saved = export_archived_pdf(record, pdf, target)
             QMessageBox.information(self, "PDF downloaded",
