@@ -603,6 +603,9 @@ class Window(QMainWindow):
             self.doc = new_doc
             new_doc = None
             self.source = path
+            self.last_signed_pdf = None
+            self.last_signed_pdf_digest = None
+            self.last_signed_source = None
             self.recent_documents = ([path] + [p for p in self.recent_documents if p != path])[:3]
             self.refresh_recent_documents()
             self.source_digest = sha256(path)
@@ -897,6 +900,8 @@ class Window(QMainWindow):
         self.loanhub_user = None
         self.loanhub_company = None
         self.last_signed_pdf = None
+        self.last_signed_pdf_digest = None
+        self.last_signed_source = None
         self.loanhub_login_status.setText("LoanHub: Not signed in")
         if hasattr(self, "loanhub_session_button"):
             self.loanhub_session_button.setText("Log in to LoanHub")
@@ -1148,6 +1153,8 @@ class Window(QMainWindow):
             signed_pdf = sign_pdf_many(self.preview_pdf, self.signatures, output,
                                        source_document=self.source)
             self.last_signed_pdf = signed_pdf
+            self.last_signed_pdf_digest = sha256(signed_pdf)
+            self.last_signed_source = self.source
             QMessageBox.information(self, "Saved", "Signed PDF saved:\\n" + signed_pdf)
         except Exception as exc:
             QMessageBox.critical(self, "Save failed", str(exc))
@@ -1157,6 +1164,15 @@ class Window(QMainWindow):
             return
         if not self.last_signed_pdf or not Path(self.last_signed_pdf).is_file():
             QMessageBox.warning(self, "WhatsApp", "Save a signed PDF before sending.")
+            return
+        if self.last_signed_source != self.source:
+            QMessageBox.warning(self, "WhatsApp", "The signed PDF belongs to another document. Save this document first.")
+            return
+        try:
+            if sha256(self.last_signed_pdf) != self.last_signed_pdf_digest:
+                raise ValueError("Signed PDF has changed since saving. Reopen and sign again.")
+        except (OSError, ValueError) as exc:
+            QMessageBox.warning(self, "WhatsApp", str(exc))
             return
         WhatsAppDeliveryDialog(self.loanhub_access_token, self.loanhub_company,
                                self.last_signed_pdf, self).exec()
