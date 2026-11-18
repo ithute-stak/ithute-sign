@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
 
 from signed_library import list_signed_pdfs, verify_archived_pdf
 from imail_dialog import IMailDeliveryDialog
+from pdf_preview import PdfPreview
 
 
 def pdf_icon(size=64):
@@ -138,11 +139,16 @@ class SignedLibraryDialog(QDialog):
                 widget.setMovement(QListWidget.Static)
                 widget.setSpacing(10)
             widget.itemDoubleClicked.connect(self.activate_item)
+            widget.currentItemChanged.connect(self.preview_selection)
             self.lists.append(widget)
             self.views.addWidget(widget)
         panel_layout.addWidget(self.views)
         splitter.addWidget(panel)
+        self.preview = PdfPreview()
+        self.preview.setMinimumWidth(260)
+        splitter.addWidget(self.preview)
         splitter.setStretchFactor(1, 4)
+        splitter.setStretchFactor(2, 2)
         root.addWidget(splitter, 1)
 
         footer = QHBoxLayout()
@@ -209,10 +215,12 @@ class SignedLibraryDialog(QDialog):
     def set_mode(self, index):
         old = self.current_record()
         self.views.setCurrentIndex(index)
+        self.preview.clear()
         if old is not None:
             for i in range(self.lists[index].count()):
                 if self.lists[index].item(i).data(Qt.UserRole) == old:
                     self.lists[index].setCurrentRow(i)
+                    self.preview_selection(self.lists[index].item(i), None)
                     break
 
     def refresh(self, *_):
@@ -255,6 +263,27 @@ class SignedLibraryDialog(QDialog):
                 widget.addItem(item)
         self.count.setText(f"{len(self.groups)} client folders  •  {len(self.entries)} documents")
         self.status.setText(f"{len(folders)} folders  •  {len(shown)} documents shown")
+        self.preview.clear()
+
+    def preview_selection(self, current, previous):
+        if self.views.currentWidget() not in self.lists:
+            return
+        if not current:
+            self.preview.clear()
+            return
+        entry_id = current.data(Qt.UserRole)
+        if not entry_id or entry_id.startswith("folder:"):
+            self.preview.clear("Open a client folder to select a PDF")
+            return
+        for record, path in self.entries:
+            if record["id"] == entry_id:
+                try:
+                    verified = verify_archived_pdf(record, path)
+                    self.preview.load_pdf(verified, record)
+                except (OSError, ValueError):
+                    self.preview.clear("Document integrity verification failed")
+                return
+        self.preview.clear("Document unavailable")
 
     def current_record(self):
         item = self.lists[self.views.currentIndex()].currentItem()
