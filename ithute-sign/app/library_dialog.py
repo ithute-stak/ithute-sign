@@ -141,6 +141,9 @@ class SignedLibraryDialog(QDialog):
         panel_layout.setContentsMargins(12, 0, 0, 0)
         self.breadcrumb = QLabel("IthuteSign  /  All documents")
         panel_layout.addWidget(self.breadcrumb)
+        self.column_heading = QLabel("NAME                                      CLIENT NATIONAL ID                 DATE SAVED                 SIZE")
+        self.column_heading.setStyleSheet("font-weight: bold; color: #254662; background: #dfeaf5; padding: 10px; border-radius: 5px;")
+        panel_layout.addWidget(self.column_heading)
         self.views = QStackedWidget()
         self.lists = []
         for mode in (QListWidget.ListMode, QListWidget.IconMode):
@@ -239,6 +242,7 @@ class SignedLibraryDialog(QDialog):
     def set_mode(self, index):
         old = self.current_record()
         self.views.setCurrentIndex(index)
+        self.column_heading.setVisible(index == 0)
         self.preview.clear()
         if old is not None:
             for i in range(self.lists[index].count()):
@@ -291,8 +295,10 @@ class SignedLibraryDialog(QDialog):
                     size_kb = (path.stat().st_size + 1023) // 1024
                 except OSError:
                     size_kb = 0
-                label = (record.get("name", "Document") + ("\\n" if widget.viewMode() == QListWidget.IconMode else "  |  ") +
-                         folder + ("" if widget.viewMode() == QListWidget.IconMode else "  |  " + date + "  |  " + str(size_kb) + " KB"))
+                if widget.viewMode() == QListWidget.IconMode:
+                    label = record.get("name", "Document") + "\\n" + folder
+                else:
+                    label = f"{record.get('name', 'Document'):<40}  {folder:<22}  {date:<19}  {size_kb:>6} KB"
                 item = QListWidgetItem(self.pdf_file_icon, label)
                 item.setData(Qt.UserRole, record["id"])
                 item.setToolTip(f"Client: {folder}\\nDocument: {record.get('name')}\\nSaved: {date}")
