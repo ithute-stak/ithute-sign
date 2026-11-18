@@ -7,7 +7,7 @@ from PySide6.QtGui import QIcon, QPixmap, QPainter, QColor, QFont, QPen
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
     QTreeWidget, QTreeWidgetItem, QListWidget, QListWidgetItem, QSplitter,
-    QWidget, QStackedWidget, QMessageBox, QStyle, QAbstractItemView, QFileDialog, QComboBox,
+    QWidget, QStackedWidget, QMessageBox, QStyle, QAbstractItemView, QFileDialog, QComboBox, QHeaderView,
 )
 
 from signed_library import list_signed_pdfs, verify_archived_pdf
@@ -141,26 +141,35 @@ class SignedLibraryDialog(QDialog):
         panel_layout.setContentsMargins(12, 0, 0, 0)
         self.breadcrumb = QLabel("IthuteSign  /  All documents")
         panel_layout.addWidget(self.breadcrumb)
-        self.column_heading = QLabel("NAME                                      CLIENT NATIONAL ID                 DATE SAVED                 SIZE")
-        self.column_heading.setStyleSheet("font-weight: bold; color: #254662; background: #dfeaf5; padding: 10px; border-radius: 5px;")
-        panel_layout.addWidget(self.column_heading)
         self.views = QStackedWidget()
         self.lists = []
-        for mode in (QListWidget.ListMode, QListWidget.IconMode):
-            widget = QListWidget()
-            widget.setViewMode(mode)
-            widget.setSelectionMode(QAbstractItemView.SingleSelection)
-            widget.setIconSize(QSize(42, 42) if mode == QListWidget.IconMode else QSize(23, 23))
-            if mode == QListWidget.IconMode:
-                widget.setGridSize(QSize(185, 125))
-                widget.setWordWrap(True)
-                widget.setResizeMode(QListWidget.Adjust)
-                widget.setMovement(QListWidget.Static)
-                widget.setSpacing(10)
-            widget.itemDoubleClicked.connect(self.activate_item)
-            widget.currentItemChanged.connect(self.preview_selection)
-            self.lists.append(widget)
-            self.views.addWidget(widget)
+        details = QTreeWidget()
+        details.setHeaderLabels(["Name", "Client National ID", "Date saved", "Type", "Size"])
+        details.setRootIsDecorated(False)
+        details.setAlternatingRowColors(True)
+        details.setSelectionMode(QAbstractItemView.SingleSelection)
+        details.setIconSize(QSize(24, 24))
+        details.header().setSectionResizeMode(QHeaderView.Interactive)
+        details.header().setStretchLastSection(False)
+        for column, width in enumerate((245, 155, 145, 70, 90)):
+            details.setColumnWidth(column, width)
+        details.itemDoubleClicked.connect(self.activate_item)
+        details.currentItemChanged.connect(self.preview_selection)
+        self.lists.append(details)
+        self.views.addWidget(details)
+        tiles = QListWidget()
+        tiles.setViewMode(QListWidget.IconMode)
+        tiles.setSelectionMode(QAbstractItemView.SingleSelection)
+        tiles.setIconSize(QSize(42, 42))
+        tiles.setGridSize(QSize(185, 125))
+        tiles.setWordWrap(True)
+        tiles.setResizeMode(QListWidget.Adjust)
+        tiles.setMovement(QListWidget.Static)
+        tiles.setSpacing(10)
+        tiles.itemDoubleClicked.connect(self.activate_item)
+        tiles.currentItemChanged.connect(self.preview_selection)
+        self.lists.append(tiles)
+        self.views.addWidget(tiles)
         panel_layout.addWidget(self.views)
         splitter.addWidget(panel)
         self.preview = PdfPreview()
@@ -233,22 +242,31 @@ class SignedLibraryDialog(QDialog):
             self.navigate(self.history[self.history_index], record_history=False)
 
     def activate_item(self, item):
-        value = item.data(Qt.UserRole)
+        value = self.item_key(item)
         if isinstance(value, str) and value.startswith("folder:"):
             self.navigate(value[7:])
         else:
             self.open_selected()
 
+    @staticmethod
+    def item_key(item):
+        if item is None:
+            return None
+        if isinstance(item, QTreeWidgetItem):
+            return item.data(0, Qt.UserRole)
+        return item.data(Qt.UserRole)
+
     def set_mode(self, index):
         old = self.current_record()
         self.views.setCurrentIndex(index)
-        self.column_heading.setVisible(index == 0)
         self.preview.clear()
         if old is not None:
-            for i in range(self.lists[index].count()):
-                if self.lists[index].item(i).data(Qt.UserRole) == old:
-                    self.lists[index].setCurrentRow(i)
-                    self.preview_selection(self.lists[index].item(i), None)
+            widget = self.lists[index]
+            items = (widget.topLevelItem(i) for i in range(widget.topLevelItemCount())) if index == 0 else (
+                widget.item(i) for i in range(widget.count()))
+            for item in items:
+                if self.item_key(item) == old:
+                    widget.setCurrentItem(item)
                     break
 
     def refresh(self, *_):
@@ -283,11 +301,17 @@ class SignedLibraryDialog(QDialog):
                        reverse=sort_index == 4)
         for widget in self.lists:
             widget.clear()
+            is_details = isinstance(widget, QTreeWidget)
             for folder, count in folders:
-                label = folder + ("\\n" if widget.viewMode() == QListWidget.IconMode else "  |  ") + str(count) + " documents"
-                item = QListWidgetItem(self.folder_icon, label)
-                item.setData(Qt.UserRole, "folder:" + folder)
-                widget.addItem(item)
+                if is_details:
+                    item = QTreeWidgetItem([folder, "", "", "Folder", f"{count} files"])
+                    item.setIcon(0, self.folder_icon)
+                    item.setData(0, Qt.UserRole, "folder:" + folder)
+                    widget.addTopLevelItem(item)
+                else:
+                    item = QListWidgetItem(self.folder_icon, f"{folder}\\n{count} documents")
+                    item.setData(Qt.UserRole, "folder:" + folder)
+                    widget.addItem(item)
             for record, path in shown:
                 folder = record.get("national_id") or "Legacy / unassigned"
                 date = record.get("created_at", "")[:16].replace("T", " ")
@@ -295,14 +319,18 @@ class SignedLibraryDialog(QDialog):
                     size_kb = (path.stat().st_size + 1023) // 1024
                 except OSError:
                     size_kb = 0
-                if widget.viewMode() == QListWidget.IconMode:
-                    label = record.get("name", "Document") + "\\n" + folder
+                name = record.get("name", "Document")
+                if is_details:
+                    item = QTreeWidgetItem([name, folder, date, "PDF", f"{size_kb} KB"])
+                    item.setIcon(0, self.pdf_file_icon)
+                    item.setData(0, Qt.UserRole, record["id"])
+                    item.setToolTip(0, name)
+                    widget.addTopLevelItem(item)
                 else:
-                    label = f"{record.get('name', 'Document'):<40}  {folder:<22}  {date:<19}  {size_kb:>6} KB"
-                item = QListWidgetItem(self.pdf_file_icon, label)
-                item.setData(Qt.UserRole, record["id"])
-                item.setToolTip(f"Client: {folder}\\nDocument: {record.get('name')}\\nSaved: {date}")
-                widget.addItem(item)
+                    item = QListWidgetItem(self.pdf_file_icon, name + "\\n" + folder)
+                    item.setData(Qt.UserRole, record["id"])
+                    item.setToolTip(f"Client: {folder}\\nSaved: {date}\\nSize: {size_kb} KB")
+                    widget.addItem(item)
         self.count.setText(f"{len(self.groups)} client folders  •  {len(self.entries)} documents")
         self.status.setText(f"{len(folders)} folders  •  {len(shown)} documents shown")
         self.preview.clear()
@@ -313,7 +341,7 @@ class SignedLibraryDialog(QDialog):
         if not current:
             self.preview.clear()
             return
-        entry_id = current.data(Qt.UserRole)
+        entry_id = self.item_key(current)
         if not entry_id or entry_id.startswith("folder:"):
             self.preview.clear("Open a client folder to select a PDF")
             return
@@ -329,7 +357,7 @@ class SignedLibraryDialog(QDialog):
 
     def current_record(self):
         item = self.lists[self.views.currentIndex()].currentItem()
-        return item.data(Qt.UserRole) if item else None
+        return self.item_key(item)
 
     def selected_pdf(self):
         record_id = self.current_record()
