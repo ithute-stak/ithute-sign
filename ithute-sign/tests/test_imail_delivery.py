@@ -69,3 +69,15 @@ def test_imail_recipient_refusal_is_not_success(tmp_path):
             send_signed_pdf("smtp.example.com", 465, "ssl",
                             "documents@batlokoa.co.ls", "test-password",
                             "client@example.com", pdf, "REF-3")
+
+
+@pytest.mark.parametrize("reference", ["REF\\nBcc: other@example.com", "REF\\tX", "REF\\x7f"])
+def test_imail_rejects_control_characters_in_reference(tmp_path, reference):
+    pdf = tmp_path / "contract.pdf"
+    pdf.write_bytes(b"%PDF-1.7\\n" + b" " * 120)
+    with patch("imail_delivery.smtplib.SMTP_SSL") as smtp:
+        with pytest.raises(ValueError, match="contract reference"):
+            send_signed_pdf("smtp.example.com", 465, "ssl",
+                            "documents@batlokoa.co.ls", "test-password",
+                            "client@example.com", pdf, reference)
+        smtp.assert_not_called()
