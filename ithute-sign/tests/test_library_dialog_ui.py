@@ -17,7 +17,13 @@ from library_dialog import SignedLibraryDialog
 def app():
     instance = QApplication.instance() or QApplication([])
     yield instance
-    # Release Qt-owned clipboard MIME data while QApplication is still alive.\n    # Otherwise some PySide6/Linux versions crash during interpreter shutdown.\n    from PySide6.QtGui import QGuiApplication\n    QGuiApplication.clipboard().clear()\n    import gc\n    gc.collect()\n
+    # Release Qt-owned clipboard MIME data while QApplication is still alive.
+    # Otherwise some PySide6/Linux versions crash during interpreter shutdown.
+    from PySide6.QtGui import QGuiApplication
+    QGuiApplication.clipboard().clear()
+    import gc
+    gc.collect()
+
 
 @pytest.fixture
 def explorer(tmp_path, monkeypatch, app):
@@ -31,7 +37,9 @@ def explorer(tmp_path, monkeypatch, app):
         archive_signed_pdf(source, national_id="123456789012")
     dialog = SignedLibraryDialog(lambda _: None)
     yield dialog
-    dialog.close()\n    dialog.deleteLater()\n    app.processEvents()
+    dialog.close()
+    dialog.deleteLater()
+    app.processEvents()
 
 
 def test_folder_navigation_and_details_columns(explorer):
