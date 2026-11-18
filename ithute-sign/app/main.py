@@ -1016,22 +1016,30 @@ class Window(QMainWindow):
         if not pending:
             QMessageBox.information(self, "LoanHub", "No pending signature fields found.")
             return
-        # Offline borrower-only capture is not safe for templates that still
-        # require independent witness attestations. Never impersonate a witness.
-        witness_roles = [field.role for field in pending if "witness" in field.role.lower()]
-        if witness_roles:
-            QMessageBox.warning(
-                self, "Witness signatures required",
-                "This LoanHub contract still requires separate witness signatures: "
-                + ", ".join(witness_roles)
-                + ". These cannot be supplied automatically using the lender's "
-                  "stored signature. Use the existing guided signing workflow "
-                  "until witness authorization is configured.")
         captured = []
         try:
             self.page_index = 6
             self.redraw()
             for field in pending:
+                if field.role == "Lender execution" and getattr(self, "session_signature", None):
+                    employee = getattr(self, "local_user", None)
+                    if not employee:
+                        raise ValueError("Local employee session is required for lender signing")
+                    consent = QMessageBox.question(
+                        self, "Authorize lender signature",
+                        "Apply the enrolled signature of " + employee["display_name"]
+                        + " to the LENDER EXECUTION field of this LoanHub contract? "
+                          "Confirm only if you are authorized to sign for the lender.",
+                        QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+                    if consent != QMessageBox.Yes:
+                        return
+                    target = Path(self.temp.name) / ("loanhub_lender_" + uuid.uuid4().hex + ".png")
+                    fd = os.open(str(target), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+                    with os.fdopen(fd, "wb") as out:
+                        out.write(self.session_signature)
+                    validate_signature_png(target)
+                    captured.append((field, str(target), datetime.now().astimezone()))
+                    continue
                 if not self.show_loanhub_progress(
                         pending, [entry[0].role for entry in captured]):
                     return
