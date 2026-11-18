@@ -20,7 +20,7 @@ def validate_recipient(value):
     if (not address or parsed_name or address != value or value.count("@") != 1
             or any(c.isspace() for c in value) or "\r" in value or "\n" in value
             or len(value) > 254 or "." not in value.rsplit("@", 1)[-1]
-            or not re.fullmatch(r"[A-Za-z0-9.!#$%&\x27*+/=?^_`{|}~-]+@[A-Za-z0-9-]+(?:\\.[A-Za-z0-9-]+)+", value)):
+            or not re.fullmatch(r"[A-Za-z0-9.!#$%&\x27*+/=?^_`{|}~-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+", value)):
         raise ValueError("Enter a valid client email address")
     return address
 
