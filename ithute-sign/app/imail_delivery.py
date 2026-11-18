@@ -4,6 +4,7 @@ Credentials are used for this send only, never stored in application files.
 SMTP acceptance does not establish final inbox delivery.
 """
 import smtplib
+import re
 import ssl
 from email.message import EmailMessage
 from email.utils import parseaddr
@@ -18,7 +19,8 @@ def validate_recipient(value):
     parsed_name, address = parseaddr(value)
     if (not address or parsed_name or address != value or value.count("@") != 1
             or any(c.isspace() for c in value) or "\r" in value or "\n" in value
-            or len(value) > 254 or "." not in value.rsplit("@", 1)[-1]):
+            or len(value) > 254 or "." not in value.rsplit("@", 1)[-1]
+            or not re.fullmatch(r"[A-Za-z0-9.!#$%&\x27*+/=?^_`{|}~-]+@[A-Za-z0-9-]+(?:\\.[A-Za-z0-9-]+)+", value)):
         raise ValueError("Enter a valid client email address")
     return address
 
@@ -26,7 +28,8 @@ def validate_recipient(value):
 def send_signed_pdf(host, port, security, username, password, recipient, pdf_path, reference):
     """Submit a signed PDF via authenticated SMTP over verified TLS."""
     host = host.strip()
-    if not host or any(c.isspace() for c in host) or "/" in host or "@" in host:
+    if (not host or any(c.isspace() for c in host) or "/" in host or "@" in host
+            or ":" in host or "\\" in host or host.startswith(".")):
         raise ValueError("Configure the iMail SMTP hostname")
     if not isinstance(port, int) or port not in (465, 587):
         raise ValueError("Use SMTP port 465 (SSL) or 587 (STARTTLS)")
@@ -61,7 +64,9 @@ def send_signed_pdf(host, port, security, username, password, recipient, pdf_pat
     if security == "ssl":
         with smtplib.SMTP_SSL(host, port, timeout=30, context=context) as smtp:
             smtp.login(SENDER, password)
-            smtp.send_message(msg, from_addr=SENDER, to_addrs=[recipient])
+            refused = smtp.send_message(msg, from_addr=SENDER, to_addrs=[recipient])
+            if refused:
+                raise smtplib.SMTPRecipientsRefused(refused)
     else:
         with smtplib.SMTP(host, port, timeout=30) as smtp:
             smtp.ehlo()
