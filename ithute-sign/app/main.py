@@ -1021,16 +1021,34 @@ class Window(QMainWindow):
                 captured.append((field, str(target), datetime.now().astimezone()))
             if not self.review_loanhub_signatures(pending, captured):
                 return
-            default = str(Path(self.source).with_name(Path(self.source).stem + "_signed.pdf"))
-            output, _ = QFileDialog.getSaveFileName(self, "Save LoanHub signed PDF", default, "PDF (*.pdf)")
-            if not output:
-                return
-            if not output.lower().endswith(".pdf"):
-                output += ".pdf"
             if sha256(self.source) != self.source_digest:
                 raise ValueError("Source PDF changed during signing")
-            signed = save_loanhub_signed(self.source, output, captured)
-            self.show_loanhub_completion(signed, captured)
+            with tempfile.TemporaryDirectory(prefix="ithutesign_loanhub_") as temporary:
+                output = str(Path(temporary) / (Path(self.source).stem + "_signed.pdf"))
+                signed = save_loanhub_signed(self.source, output, captured)
+                ids = extract_national_ids(signed)
+                if len(ids) == 1:
+                    national_id = ids[0]
+                    confirmation = QMessageBox.question(
+                        self, "Confirm client National ID",
+                        "File this signed LoanHub document under National ID: " + national_id + "?",
+                        QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+                    if confirmation != QMessageBox.Yes:
+                        return
+                else:
+                    explanation = ("Multiple National IDs were detected." if ids else
+                                   "No labelled National ID was detected.")
+                    entered, accepted = QInputDialog.getText(
+                        self, "Client National ID",
+                        explanation + "\\nEnter the CLIENT'S National ID from the contract:")
+                    if not accepted:
+                        return
+                    national_id = normalize_national_id(entered)
+                archived = archive_signed_pdf(signed, national_id=national_id)
+            self.last_signed_pdf = str(archived)
+            self.last_signed_pdf_digest = sha256(archived)
+            self.last_signed_source = self.source
+            self.show_loanhub_completion(archived, captured)
         except Exception as exc:
             QMessageBox.critical(self, "LoanHub signing failed", str(exc))
 
