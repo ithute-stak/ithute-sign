@@ -89,6 +89,20 @@ class LoanHubSigningSafetyTests(unittest.TestCase):
                 block.get("type") == 1 and fitz.Rect(block["bbox"]).intersects(region)
                 for block in before[6].get_text("dict")["blocks"]))
 
+    def test_signed_witness_without_image_fails_closed(self):
+        """A printed SIGNED label cannot replace witness signature evidence."""
+        with fitz.open(self.source) as pdf:
+            pdf[5].insert_text((70, 100), "SINGLE SIGNATURE EXECUTION")
+            page = pdf[6]
+            page.insert_text((70, 100), "ANNEXURE C - ACCEPTANCE AND SIGNATURES")
+            page.insert_text((70, 120), "BORROWER WITNESS")
+            page.insert_text((70, 140), "LENDER WITNESS")
+            page.insert_text((495, 242), "SIGNED", fontsize=7)
+            page.insert_text((495, 377), "PENDING", fontsize=7)
+            page.insert_text((402, 458), "Pending", fontsize=7)
+            with self.assertRaisesRegex(ValueError, "no signature image"):
+                detect_loanhub(pdf)
+
     def test_source_is_never_overwritten(self):
         original = self.source.read_bytes()
         with self.assertRaises(ValueError):
