@@ -46,5 +46,7 @@ jobs:
           python -m pip install PySide6 PyMuPDF pytest
       - name: Compile library modules
         run: python -m py_compile app/library_dialog.py app/library_export.py app/pdf_preview.py app/signed_library.py
+      - name: Validate Linux STU-540 launcher syntax
+        run: bash -n wacom-bridge/linux/STUCapture
       - name: Run library regression tests
         run: python -m pytest tests/test_signed_library.py tests/test_library_export.py tests/test_library_dialog_ui.py -q
