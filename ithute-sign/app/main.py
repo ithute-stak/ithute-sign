@@ -23,6 +23,7 @@ from local_login_dialog import LocalLoginDialog, default_user_db
 from local_users import LocalUsers
 from signature_vault import SignatureVault
 from signature_authorization_dialog import SignatureAuthorizationDialog
+from loanhub_preflight_dialog import LoanHubPreflightDialog
 from PySide6.QtWidgets import QLineEdit
 from device import probe_bridge, show_screen, validate_signature_png
 from geometry import fit_rectangle
@@ -1024,6 +1025,18 @@ class Window(QMainWindow):
             return
         if not pending:
             QMessageBox.information(self, "LoanHub", "No pending signature fields found.")
+            return
+        try:
+            from loanhub import inspect_loanhub_signatures
+            inspection = inspect_loanhub_signatures(self.doc)
+            employee = getattr(self, "local_user", None)
+            name = employee["display_name"] if employee else "Not signed in"
+            preflight = LoanHubPreflightDialog(
+                inspection, name, bool(getattr(self, "session_signature", None)), self)
+            if preflight.exec() != QDialog.Accepted:
+                return
+        except Exception as exc:
+            QMessageBox.warning(self, "LoanHub inspection failed", str(exc))
             return
         captured = []
         try:
