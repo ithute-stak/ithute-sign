@@ -19,7 +19,10 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QLabel, QPush
     QVBoxLayout, QHBoxLayout, QFileDialog, QMessageBox, QScrollArea, QSpinBox,
     QDialog, QDialogButtonBox, QListWidget, QProgressBar, QStackedWidget, QStyle, QInputDialog)
 from document import to_pdf, sign_pdf_many, Placement, sha256
-from local_login_dialog import LocalLoginDialog
+from local_login_dialog import LocalLoginDialog, default_user_db
+from local_users import LocalUsers
+from signature_vault import SignatureVault
+from PySide6.QtWidgets import QLineEdit
 from device import probe_bridge, show_screen, validate_signature_png
 from geometry import fit_rectangle
 from loanhub import detect_loanhub, save_loanhub_signed
@@ -275,6 +278,10 @@ class Window(QMainWindow):
         brand = QLabel("ITHUTESIGN")
         brand.setObjectName("brand")
         menu.addWidget(brand)
+        self.local_signature_button = QPushButton("My stored signature")
+        self.local_signature_button.setMinimumHeight(38)
+        self.local_signature_button.clicked.connect(self.enroll_local_signature)
+        menu.addWidget(self.local_signature_button)
         login_button = QPushButton("Log in to LoanHub")
         decorate_action(login_button, "Log in to LoanHub")
         login_button.setObjectName("primary")
@@ -1052,6 +1059,51 @@ class Window(QMainWindow):
             self.show_loanhub_completion(archived, captured)
         except Exception as exc:
             QMessageBox.critical(self, "LoanHub signing failed", str(exc))
+
+    def enroll_local_signature(self):
+        """Explicitly enroll or replace the signed-in employee's encrypted signature."""
+        user = getattr(self, "local_user", None)
+        if not user:
+            QMessageBox.warning(self, "Sign in required", "Local employee authentication is required.")
+            return
+        password, ok = QInputDialog.getText(
+            self, "Verify employee", "Enter your local account password:",
+            QLineEdit.Password)
+        if not ok:
+            return
+        store = LocalUsers(default_user_db())
+        try:
+            verified = store.authenticate(user["username"], password)
+            if not verified or verified["id"] != user["id"]:
+                QMessageBox.warning(self, "Authentication failed", "Incorrect password.")
+                return
+        finally:
+            store.close()
+        dialog = CaptureDialog(self.temp.name, self)
+        if dialog.exec() != QDialog.Accepted:
+            return
+        target = Path(self.temp.name) / ("enrollment_" + uuid.uuid4().hex + ".png")
+        try:
+            dialog.export(target)
+            validate_signature_png(target)
+            vault = SignatureVault(default_user_db())
+            try:
+                if vault.has_signature(user["id"]):
+                    answer = QMessageBox.question(
+                        self, "Replace stored signature",
+                        "Replace your existing registered signature?")
+                    if answer != QMessageBox.Yes:
+                        return
+                vault.enroll(user["id"], password, target)
+            finally:
+                vault.close()
+            QMessageBox.information(self, "Signature enrolled",
+                "Your signature has been stored encrypted for your local account. "
+                "It will not be placed on documents automatically.")
+        except Exception as exc:
+            QMessageBox.warning(self, "Enrollment failed", str(exc))
+        finally:
+            target.unlink(missing_ok=True)
 
     def add_signature(self):
         if self.doc is None or self.position is None:
