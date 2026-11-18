@@ -1,5 +1,6 @@
 """IthuteSign WhatsApp contract delivery dialog."""
 import os
+import uuid
 from pathlib import Path
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
     QLineEdit, QPushButton, QMessageBox, QCheckBox)
@@ -15,6 +16,7 @@ class WhatsAppDeliveryDialog(QDialog):
         self.company = company
         self.pdf_path = str(pdf_path)
         self.delivery_id = None
+        self.standalone = not (token and company)
         layout = QVBoxLayout(self)
         layout.setSpacing(13)
         title = QLabel("Send signed contract")
@@ -30,6 +32,15 @@ class WhatsAppDeliveryDialog(QDialog):
             )
             note.setWordWrap(True)
             layout.addWidget(note)
+            layout.addWidget(QLabel("Standalone company ID (UUID)"))
+            self.company_id_input = QLineEdit()
+            self.company_id_input.setPlaceholderText("Company UUID issued by administrator")
+            layout.addWidget(self.company_id_input)
+            layout.addWidget(QLabel("Standalone delivery credential (this session only)"))
+            self.credential_input = QLineEdit()
+            self.credential_input.setEchoMode(QLineEdit.Password)
+            self.credential_input.setPlaceholderText("its_...")
+            layout.addWidget(self.credential_input)
         layout.addWidget(QLabel("Document: " + Path(pdf_path).name))
         layout.addWidget(QLabel("Client WhatsApp number"))
         self.number = QLineEdit()
@@ -44,9 +55,9 @@ class WhatsAppDeliveryDialog(QDialog):
         actions = QHBoxLayout()
         self.send = QPushButton("Send via WhatsApp")
         self.send.clicked.connect(self.submit)
-        if not token or not company:
+        if self.standalone:
             self.send.setEnabled(False)
-            self.send.setToolTip("Standalone delivery requires a separate authenticated business account")
+            self.send.setToolTip("Sending remains disabled pending document and recipient verification")
         actions.addWidget(self.send)
         self.check = QPushButton("Check delivery status")
         self.check.setEnabled(False)
@@ -58,6 +69,12 @@ class WhatsAppDeliveryDialog(QDialog):
         layout.addLayout(actions)
 
     def submit(self):
+        if self.standalone:
+            QMessageBox.warning(self, "WhatsApp",
+                "Standalone delivery is not yet enabled. Company credentials can be "
+                "prepared here, but signed-document and recipient verification must "
+                "be completed before sending.")
+            return
         try:
             number = normalise_whatsapp_number(self.number.text())
             reference = self.reference.text().strip()
