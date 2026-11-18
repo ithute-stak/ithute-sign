@@ -136,3 +136,17 @@ def test_explorer_uses_readable_light_palette(explorer):
     assert palette.color(QPalette.Highlight).name() == "#d7ebff"
     assert palette.color(QPalette.HighlightedText).name() == "#102d4b"
     assert "alternate-background-color: #f3f7fc" in explorer.styleSheet()
+
+
+def test_copy_shortcut_is_scoped_to_document_lists(explorer):
+    from PySide6.QtGui import QShortcut
+    from PySide6.QtCore import Qt
+    copy_shortcuts = [
+        shortcut for shortcut in explorer.shortcuts
+        if isinstance(shortcut, QShortcut)
+        and shortcut.key().toString() == "Ctrl+C"
+    ]
+    assert len(copy_shortcuts) == 2
+    assert {shortcut.parent() for shortcut in copy_shortcuts} == set(explorer.lists)
+    assert all(shortcut.context() == Qt.WidgetWithChildrenShortcut
+               for shortcut in copy_shortcuts)
