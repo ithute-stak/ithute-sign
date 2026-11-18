@@ -79,7 +79,7 @@ def detect_loanhub(pdf):
             # Verify it contains an image within the field; otherwise fail closed.
             region = fitz.Rect(*box)
             images = [b for b in page.get_text("dict")["blocks"]
-                      if b.get("type") == 1 and fitz.Rect(b["bbox"]).intersects(region)]
+                      if b.get("type") == 1 and region.contains(fitz.Rect(b["bbox"]))]
             if not images:
                 raise ValueError("Missing signature and placeholder for " + role)
     return found
