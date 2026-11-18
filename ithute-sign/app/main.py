@@ -699,13 +699,15 @@ class Window(QMainWindow):
             self.page_index += 1
             self.position = None
             self.redraw()
-    def show_loanhub_progress(self, pending, completed=()):
-        """Single guided checkpoint before each Wacom capture, with cancellation."""
+    def show_loanhub_progress(self, pending, completed=(), selected_roles=(), next_role=None):
+        """Show prepared stored signatures separately from pending tablet captures."""
         completed_roles = set(completed)
+        selected_roles = set(selected_roles)
         remaining = [field for field in pending if field.role not in completed_roles]
         if not remaining:
             return True
-        next_role = remaining[0].role
+        if next_role is None:
+            next_role = remaining[0].role
         dlg = QDialog(self)
         dlg.setWindowTitle("IthuteSign — LoanHub signing")
         dlg.setMinimumWidth(520)
@@ -732,8 +734,14 @@ class Window(QMainWindow):
         body.addWidget(QLabel("Page 7 · Annexure C · Offline signing"))
         checklist = QListWidget()
         for field in pending:
-            checklist.addItem(("✓  Captured  —  " if field.role in completed_roles
-                               else "○  Awaiting signature  —  ") + field.role)
+            if field.role in completed_roles:
+                status = ("✓  Stored signature prepared  —  "
+                          if field.role in selected_roles else "✓  Tablet signature captured  —  ")
+            elif field.role in selected_roles:
+                status = "◉  Stored signature selected  —  "
+            else:
+                status = "○  Awaiting tablet signature  —  "
+            checklist.addItem(status + field.role)
         checklist.setMinimumHeight(min(260, 52 * len(pending) + 20))
         body.addWidget(checklist)
         progress = QProgressBar()
@@ -1057,6 +1065,11 @@ class Window(QMainWindow):
                 if consent.exec() != QDialog.Accepted:
                     return
                 selected_roles = consent.selected_roles
+            # Prepare every selected employee signature before prompting for
+            # tablet capture, so the checklist reflects all selections.
+            pending = sorted(pending, key=lambda field: (
+                0 if field.role in selected_roles else 1,
+                0 if field.role == "Borrower execution" else 1))
             for field in pending:
                 if field.role in selected_roles and employee and enrolled:
                     target = Path(self.temp.name) / ("loanhub_employee_" + uuid.uuid4().hex + ".png")
@@ -1067,7 +1080,8 @@ class Window(QMainWindow):
                     captured.append((field, str(target), datetime.now().astimezone()))
                     continue
                 if not self.show_loanhub_progress(
-                        pending, [entry[0].role for entry in captured]):
+                        pending, [entry[0].role for entry in captured],
+                        selected_roles=selected_roles, next_role=field.role):
                     return
                 dialog = CaptureDialog(self.temp.name, self)
                 if dialog.exec() != QDialog.Accepted:
