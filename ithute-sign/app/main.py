@@ -282,6 +282,10 @@ class Window(QMainWindow):
         self.local_signature_button.setMinimumHeight(38)
         self.local_signature_button.clicked.connect(self.enroll_local_signature)
         menu.addWidget(self.local_signature_button)
+        self.use_stored_signature_button = QPushButton("Use my stored signature")
+        self.use_stored_signature_button.setMinimumHeight(38)
+        self.use_stored_signature_button.clicked.connect(self.use_local_signature)
+        menu.addWidget(self.use_stored_signature_button)
         login_button = QPushButton("Log in to LoanHub")
         decorate_action(login_button, "Log in to LoanHub")
         login_button.setObjectName("primary")
@@ -1059,6 +1063,70 @@ class Window(QMainWindow):
             self.show_loanhub_completion(archived, captured)
         except Exception as exc:
             QMessageBox.critical(self, "LoanHub signing failed", str(exc))
+
+    def use_local_signature(self):
+        """Explicit, password-confirmed placement on the current local document only.
+
+        LoanHub lender/witness role authorization is intentionally NOT inferred
+        from local authentication; this action does not assert such a role.
+        """
+        user = getattr(self, "local_user", None)
+        if not user:
+            QMessageBox.warning(self, "Sign in required", "Local authentication is required.")
+            return
+        if self.doc is None or self.position is None:
+            QMessageBox.warning(self, "Select position",
+                "Open a document and click where your signature should be placed.")
+            return
+        x, y = self.position
+        width, height = self.width.value(), self.height.value()
+        page = self.doc[self.page_index]
+        if x + width > page.rect.width or y + height > page.rect.height:
+            QMessageBox.warning(self, "Position", "Signature must fit within the page.")
+            return
+        password, ok = QInputDialog.getText(self, "Authorize signature",
+            "Re-enter your local password to unlock your stored signature:",
+            QLineEdit.Password)
+        if not ok:
+            return
+        store = LocalUsers(default_user_db())
+        try:
+            verified = store.authenticate(user["username"], password)
+            if not verified or verified["id"] != user["id"]:
+                QMessageBox.warning(self, "Authentication failed", "Incorrect password.")
+                return
+        finally:
+            store.close()
+        vault = SignatureVault(default_user_db())
+        try:
+            png = vault.decrypt(user["id"], password)
+        except Exception as exc:
+            QMessageBox.warning(self, "Signature unavailable", str(exc))
+            return
+        finally:
+            vault.close()
+        answer = QMessageBox.question(self, "Confirm signature placement",
+            f"Place the registered signature of {user['display_name']} "
+            f"on page {self.page_index + 1} of this document? "
+            "This does not authorize a LoanHub lender or witness role.")
+        if answer != QMessageBox.Yes:
+            return
+        target = Path(self.temp.name) / ("stored_" + uuid.uuid4().hex + ".png")
+        try:
+            target.write_bytes(png)
+            validate_signature_png(target)
+            placement = Placement(self.page_index, x, y, width, height, str(target))
+            self.signatures.append(placement)
+            self.queue_selection_syncing = True
+            try:
+                self.queue.addItem(f"Page {self.page_index+1} | {width}x{height} pt | {user['display_name']}")
+            finally:
+                self.queue_selection_syncing = False
+            self.position = None
+            self.redraw()
+        except Exception as exc:
+            target.unlink(missing_ok=True)
+            QMessageBox.warning(self, "Signature placement failed", str(exc))
 
     def enroll_local_signature(self):
         """Explicitly enroll or replace the signed-in employee's encrypted signature."""
