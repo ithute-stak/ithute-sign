@@ -25,6 +25,7 @@ import httpx
 from fastapi import FastAPI, HTTPException, Header, Request
 from pydantic import BaseModel, Field
 from standalone_identity import verify_standalone_identity
+from offline_registration import OfflineDocumentRegistration, validate_registration
 
 app = FastAPI(title="IthuteSign WhatsApp Delivery", docs_url=None, redoc_url=None)
 DATABASE = Path(os.environ.get("DELIVERY_DATABASE", "/var/lib/ithutesign-delivery/delivery.sqlite3"))
@@ -82,6 +83,16 @@ async def verify_loanhub(token, company_id):
     ):
         raise HTTPException(403, "No active membership for this company")
     return str(user["id"])
+
+
+@app.post("/v1/offline-documents/preflight")
+async def preflight_offline_document(payload: OfflineDocumentRegistration,
+                                     authorization: str = Header(default="")):
+    """Validate offline-document metadata without authorising delivery."""
+    actor = verify_standalone_identity(authorization, payload.company_id)
+    result = validate_registration(payload)
+    result["status"] = "preflight_only"
+    return result
 
 
 @app.post("/v1/whatsapp/contracts", status_code=202)
