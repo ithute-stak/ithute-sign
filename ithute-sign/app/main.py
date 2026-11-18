@@ -1135,15 +1135,10 @@ class Window(QMainWindow):
             self.queue.takeItem(index)
             self.redraw()
     def save(self):
+        """Sign directly into IthuteSign's managed library, without a Save As dialog."""
         if not self.signatures:
             QMessageBox.warning(self, "No signatures", "Capture at least one signature first.")
             return
-        default = str(Path(self.source).with_name(Path(self.source).stem + "_signed.pdf"))
-        output, _ = QFileDialog.getSaveFileName(self, "Save signed PDF", default, "PDF (*.pdf)")
-        if not output:
-            return
-        if not output.lower().endswith(".pdf"):
-            output += ".pdf"
         try:
             if sha256(self.source) != self.source_digest:
                 raise ValueError("The source document changed after opening. Reopen it before signing.")
@@ -1152,22 +1147,29 @@ class Window(QMainWindow):
             return
         answer = QMessageBox.question(
             self, "Confirm signature placement",
-            f"Save {len(self.signatures)} signature(s) into a new PDF?\\n"
+            f"Save {len(self.signatures)} signature(s) to IthuteSign's document library?\\n"
             "Review the page positions and sizes before continuing.\\n"
             "The original document will not be overwritten.",
             QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         if answer != QMessageBox.Yes:
             return
         try:
-            signed_pdf = sign_pdf_many(self.preview_pdf, self.signatures, output,
-                                       source_document=self.source)
-            archived_pdf = archive_signed_pdf(signed_pdf)
+            # Generate a temporary signed PDF; the archive makes its own durable copy.
+            with tempfile.TemporaryDirectory(prefix="ithutesign_export_") as temporary:
+                output = str(Path(temporary) / (Path(self.source).stem + "_signed.pdf"))
+                signed_pdf = sign_pdf_many(self.preview_pdf, self.signatures, output,
+                                           source_document=self.source)
+                archived_pdf = archive_signed_pdf(signed_pdf)
             self.last_signed_pdf = str(archived_pdf)
             self.last_signed_pdf_digest = sha256(archived_pdf)
             self.last_signed_source = self.source
-            QMessageBox.information(self, "Saved", "Signed PDF saved and archived:\\n" + str(archived_pdf))
+            QMessageBox.information(
+                self, "Saved to IthuteSign",
+                "Signed PDF saved in IthuteSign's document library.\\n"
+                "Use 'Signed document library' to reopen or email it.")
         except Exception as exc:
             QMessageBox.critical(self, "Save failed", str(exc))
+
     def open_signed_library(self):
         """Open or send an archived signed PDF without requiring the original."""
         entries = list_signed_pdfs()
