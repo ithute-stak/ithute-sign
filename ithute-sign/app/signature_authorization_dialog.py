@@ -12,7 +12,7 @@ class SignatureAuthorizationDialog(QDialog):
         self.setMinimumWidth(560)
         self.setMinimumHeight(460)
         self.selected_roles = set()
-        self.checks = {}
+        self.checks = {}\n        self.selection_labels = {}
         self.setStyleSheet("""
             QDialog { background: #102137; color: #eaf3f8; }
             QLabel#heading { font-size: 22px; font-weight: 800; color: white; }
@@ -21,6 +21,17 @@ class SignatureAuthorizationDialog(QDialog):
             QFrame#card QLabel { color: #18344c; }
             QFrame#card QCheckBox { color: #18344c; font-size: 14px; font-weight: 600; }
             QFrame#card QCheckBox:disabled { color: #84919d; }
+            QFrame#card QCheckBox::indicator {
+                width: 23px; height: 23px; border: 2px solid #5b7286;
+                border-radius: 5px; background: white;
+            }
+            QFrame#card QCheckBox::indicator:checked {
+                background: #087e82; border: 2px solid #087e82;
+            }
+            QFrame#card QCheckBox::indicator:disabled {
+                background: #e4e9ee; border: 2px solid #b4bec8;
+            }
+            QFrame#card QCheckBox:focus { color: #087e82; }
             QPushButton#approve { background: #087e82; color: white;
                 border-radius: 8px; padding: 11px; font-weight: 700; }
             QPushButton#approve:disabled { background: #647580; }
@@ -51,13 +62,21 @@ class SignatureAuthorizationDialog(QDialog):
             check.setEnabled(eligible)
             check.setChecked(False)
             self.checks[role] = check
+            check.setMinimumHeight(38)
             inner.addWidget(check)
+            selection = QLabel("Not selected" if eligible else "Unavailable for this employee")
+            selection.setStyleSheet("color: #64748b; font-size: 11px; margin-left: 32px;")
+            inner.addWidget(selection)
+            self.selection_labels[role] = selection
+            check.toggled.connect(
+                lambda checked, label=selection: label.setText(
+                    "✓ Selected — use my stored signature" if checked else "Not selected"))
             note = QLabel(reason)
             note.setWordWrap(True)
             note.setStyleSheet("color: #667a8b; font-size: 11px; margin-left: 23px;")
             inner.addWidget(note)
         root.addWidget(card)
-        self.attest = QCheckBox("I confirm my signing authority and witness attestation")
+        self.attest = QCheckBox("I confirm my signing authority and witness attestation")\n        self.attest.setMinimumHeight(32)
         root.addWidget(self.attest)
         attestation_details = QLabel(
             "I am authorized for every selected role and personally witnessed "
