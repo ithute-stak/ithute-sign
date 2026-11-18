@@ -71,6 +71,39 @@ def detect_loanhub(pdf):
                 raise ValueError("Missing signature and placeholder for " + role)
     return found
 
+def inspect_loanhub_signatures(pdf):
+    """Return verified pending fields and distinguish records from execution ink.
+
+    A SIGNED record in the table is not evidence that the separate execution
+    signature box contains ink. Never infer one from the other.
+    """
+    pending = detect_loanhub(pdf)
+    roles = {field.role for field in pending}
+    page = pdf[6]
+    record_rects = {
+        "Borrower": fitz.Rect(349, 231, 394, 247),
+        "Lender": fitz.Rect(349, 366, 394, 383),
+    }
+    records = {}
+    for label, rect in record_rects.items():
+        value = page.get_textbox(rect).strip()
+        if value not in ("SIGNED", "PENDING"):
+            raise ValueError("Unrecognized " + label + " record status")
+        records[label] = value
+    return {
+        "pending_roles": tuple(field.role for field in pending),
+        "record_status": records,
+        "execution_status": {
+            "Borrower": "needs fresh signature" if "Borrower execution" in roles else "image present",
+            "Lender": "needs authorized signature" if "Lender execution" in roles else "image present",
+        },
+        "witness_status": {
+            role: "pending" if role in roles else "not pending"
+            for role in ("Borrower witness", "Lender witness")
+        },
+    }
+
+
 def _replace_text(page, rect, value, fontsize=8, color=(0.09, 0.22, 0.35)):
     # Remove only text within the narrowly validated target region.
     page.add_redact_annot(rect, fill=(1, 1, 1))
