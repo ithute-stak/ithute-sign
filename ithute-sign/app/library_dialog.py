@@ -7,12 +7,13 @@ from PySide6.QtGui import QIcon, QPixmap, QPainter, QColor, QFont, QPen
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
     QTreeWidget, QTreeWidgetItem, QListWidget, QListWidgetItem, QSplitter,
-    QWidget, QStackedWidget, QMessageBox, QStyle, QAbstractItemView,
+    QWidget, QStackedWidget, QMessageBox, QStyle, QAbstractItemView, QFileDialog,
 )
 
 from signed_library import list_signed_pdfs, verify_archived_pdf
 from imail_dialog import IMailDeliveryDialog
 from pdf_preview import PdfPreview
+from library_export import export_archived_pdf
 
 
 def pdf_icon(size=64):
@@ -58,18 +59,29 @@ class SignedLibraryDialog(QDialog):
         self.setWindowTitle("IthuteSign | Client Document Explorer")
         self.setMinimumSize(850, 550)
         self.setStyleSheet("""
-            QDialog { background: #f4f7fb; color: #172d46; }
-            QTreeWidget, QListWidget { background: white; color: #172d46;
-                border: 1px solid #d7e0eb; border-radius: 7px; padding: 8px; }
-            QTreeWidget::item, QListWidget::item { padding: 7px; }
+            QDialog { background: #edf3f9; color: #152b46; }
+            QLabel { color: #152b46; background: transparent; }
+            QLabel#header { color: #102943; font-size: 25px; font-weight: 800; }
+            QTreeWidget, QListWidget { background: #ffffff; color: #20364e;
+                border: 1px solid #cddae8; border-radius: 10px; padding: 9px;
+                font-size: 13px; }
+            QTreeWidget::item, QListWidget::item { padding: 9px; border-radius: 5px; }
+            QTreeWidget::item:hover, QListWidget::item:hover { background: #edf5ff; }
             QTreeWidget::item:selected, QListWidget::item:selected {
-                background: #d8eaf9; color: #102d48; }
-            QLineEdit { background: white; color: #172d46; padding: 11px;
-                border: 1px solid #cbd8e6; border-radius: 7px; }
-            QPushButton { padding: 10px 14px; background: white; color: #18304c;
-                border: 1px solid #cbd8e6; border-radius: 7px; }
-            QPushButton:hover { background: #e6f2fb; }
-            QLabel#header { font-size: 23px; font-weight: 750; }
+                background: #cde6fc; color: #0b3153; }
+            QHeaderView::section { background: #e0ebf6; color: #1b3551;
+                padding: 10px; border: none; font-weight: bold; }
+            QLineEdit { background: white; color: #142b46; padding: 12px;
+                border: 1px solid #bacde0; border-radius: 9px; font-size: 13px; }
+            QLineEdit:focus { border: 2px solid #168a9b; }
+            QPushButton { padding: 10px 16px; background: #ffffff; color: #17334f;
+                border: 1px solid #c5d5e5; border-radius: 8px; font-weight: 650; }
+            QPushButton:hover { background: #e2f2fc; border-color: #75b5d5; }
+            QPushButton:disabled { color: #8ca0b3; background: #edf1f5; }
+            QPushButton#downloadButton { background: #087f88; color: #ffffff;
+                border: 1px solid #087f88; font-weight: 750; }
+            QPushButton#downloadButton:hover { background: #06676e; }
+            QSplitter::handle { background: #dce6ef; width: 5px; }
         """)
         root = QVBoxLayout(self)
         root.setContentsMargins(22, 18, 22, 18)
@@ -145,19 +157,24 @@ class SignedLibraryDialog(QDialog):
         panel_layout.addWidget(self.views)
         splitter.addWidget(panel)
         self.preview = PdfPreview()
+        self.preview.setStyleSheet("QLabel { color: #17334f; background: transparent; }")
         self.preview.setMinimumWidth(260)
         splitter.addWidget(self.preview)
         splitter.setStretchFactor(1, 4)
-        splitter.setStretchFactor(2, 2)
+        splitter.setStretchFactor(2, 3)
+        splitter.setSizes([230, 640, 470])
         root.addWidget(splitter, 1)
 
         footer = QHBoxLayout()
         self.status = QLabel()
         footer.addWidget(self.status, 1)
         self.open_button = QPushButton("Open PDF")
+        self.download_button = QPushButton("↓ Download PDF")
+        self.download_button.setObjectName("downloadButton")
         self.email_button = QPushButton("Email via iMail")
         self.close_button = QPushButton("Close")
         footer.addWidget(self.open_button)
+        footer.addWidget(self.download_button)
         footer.addWidget(self.email_button)
         footer.addWidget(self.close_button)
         root.addLayout(footer)
@@ -170,9 +187,11 @@ class SignedLibraryDialog(QDialog):
         self.list_button.clicked.connect(lambda: self.set_mode(0))
         self.tile_button.clicked.connect(lambda: self.set_mode(1))
         self.open_button.clicked.connect(self.open_selected)
+        self.download_button.clicked.connect(self.download_selected)
         self.email_button.clicked.connect(self.email_selected)
         self.close_button.clicked.connect(self.reject)
         self.refresh()
+        self.navigate(None, record_history=False)
 
     def folder_changed(self, current, previous):
         if not self._navigating:
@@ -317,3 +336,47 @@ class SignedLibraryDialog(QDialog):
         pdf = self.selected_pdf()
         if pdf:
             IMailDeliveryDialog(str(pdf), self).exec()
+
+    def download_selected(self):
+        """Save a verified copy to a user-selected location, never move the archive."""
+        pdf = self.selected_pdf()
+        if not pdf:
+            return
+        record = next((r for r, p in self.entries if r["id"] == self.current_record()), None)
+        if record is None:
+            return
+        suggested_name = Path(record.get("name") or "signed-document.pdf").name
+        if not suggested_name.lower().endswith(".pdf"):
+            suggested_name += ".pdf"
+        default = str(Path.home() / "Downloads" / suggested_name)
+        destination, _ = QFileDialog.getSaveFileName(
+            self, "Download a copy of the signed PDF", default, "PDF documents (*.pdf)")
+        if not destination:
+            return
+        if not destination.lower().endswith(".pdf"):
+            destination += ".pdf"
+        target = Path(destination)
+        if target.exists():
+            answer = QMessageBox.question(
+                self, "File already exists",
+                "A file with this name already exists. Replace the downloaded copy?",
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            if answer != QMessageBox.Yes:
+                return
+            # The protected archive is never a valid replacement target.
+            if target.resolve() == pdf.resolve():
+                QMessageBox.warning(self, "Protected document",
+                                    "The original IthuteSign archive cannot be overwritten.")
+                return
+            try:
+                target.unlink()
+            except OSError as exc:
+                QMessageBox.critical(self, "Download failed", str(exc))
+                return
+        try:
+            saved = export_archived_pdf(record, pdf, target)
+            QMessageBox.information(self, "PDF downloaded",
+                                    "A copy was saved to:\\n" + str(saved) +
+                                    "\\n\\nThe IthuteSign original remains unchanged.")
+        except (OSError, ValueError) as exc:
+            QMessageBox.critical(self, "Download failed", str(exc))
