@@ -14,6 +14,7 @@ from signed_library import list_signed_pdfs, verify_archived_pdf
 from imail_dialog import IMailDeliveryDialog
 from pdf_preview import PdfPreview
 from library_export import export_archived_pdf
+from library_clipboard import copy_archived_pdf_to_clipboard
 
 
 def pdf_icon(size=64):
@@ -193,11 +194,13 @@ class SignedLibraryDialog(QDialog):
         self.open_button = QPushButton("Open PDF")
         self.download_button = QPushButton("↓ Download PDF")
         self.download_button.setObjectName("downloadButton")
+        self.copy_button = QPushButton("Copy PDF")
         self.properties_button = QPushButton("Properties")
         self.email_button = QPushButton("Email via iMail")
         self.close_button = QPushButton("Close")
         footer.addWidget(self.open_button)
         footer.addWidget(self.download_button)
+        footer.addWidget(self.copy_button)
         footer.addWidget(self.email_button)
         footer.addWidget(self.properties_button)
         footer.addWidget(self.close_button)
@@ -213,11 +216,13 @@ class SignedLibraryDialog(QDialog):
         self.tile_button.clicked.connect(lambda: self.set_mode(1))
         self.open_button.clicked.connect(self.open_selected)
         self.download_button.clicked.connect(self.download_selected)
+        self.copy_button.clicked.connect(self.copy_selected)
         self.email_button.clicked.connect(self.email_selected)
         self.properties_button.clicked.connect(self.show_properties)
         self.close_button.clicked.connect(self.reject)
         self.shortcuts = []
         for key, action in (("Ctrl+F", self.search.setFocus),
+                            ("Ctrl+C", self.copy_selected),
                             ("Ctrl+S", self.download_selected),
                             ("Ctrl+O", self.open_selected),
                             ("Alt+Left", self.go_back),
@@ -257,6 +262,7 @@ class SignedLibraryDialog(QDialog):
         else:
             menu.addAction("Open PDF", self.open_selected)
             menu.addAction("Download a copy…", self.download_selected)
+            menu.addAction("Copy PDF", self.copy_selected)
             menu.addAction("Email via iMail", self.email_selected)
             menu.addSeparator()
             menu.addAction("Properties", self.show_properties)
@@ -511,6 +517,20 @@ class SignedLibraryDialog(QDialog):
             )
             QMessageBox.information(self, "PDF properties", message)
             return
+
+    def copy_selected(self):
+        """Copy a verified standalone PDF to the operating system file clipboard."""
+        pdf = self.selected_pdf()
+        if not pdf:
+            return
+        record = next((r for r, _ in self.entries if r["id"] == self.current_record()), None)
+        if record is None:
+            return
+        try:
+            copy_archived_pdf_to_clipboard(record, pdf)
+            self.status.setText("Signed PDF copied — paste into a folder with Ctrl+V")
+        except (OSError, ValueError, RuntimeError) as exc:
+            QMessageBox.critical(self, "Copy PDF failed", str(exc))
 
     def download_selected(self):
         """Save a verified copy to a user-selected location, never move the archive."""
