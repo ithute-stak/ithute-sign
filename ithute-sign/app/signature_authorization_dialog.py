@@ -69,7 +69,8 @@ class SignatureAuthorizationDialog(QDialog):
             inner.addWidget(note)
         root.addWidget(card)
         self.attest = QCheckBox("I confirm my signing authority and witness attestation")
-        self.attest.setMinimumHeight(32)\n        self.attest.setStyleSheet("QCheckBox { color: white; font-weight: 600; }")
+        self.attest.setMinimumHeight(32)
+        self.attest.setStyleSheet("QCheckBox { color: white; font-weight: 600; }")
         root.addWidget(self.attest)
         attestation_details = QLabel(
             "I am authorized for every selected role and personally witnessed "
