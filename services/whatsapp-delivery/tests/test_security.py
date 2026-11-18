@@ -83,3 +83,35 @@ def test_webhook_rejects_invalid_signature(service, monkeypatch):
             content=b'{"entry":[]}',
             headers={"X-Hub-Signature-256": "sha256=bad"})
     assert response.status_code == 403
+
+
+def test_webhook_delivery_status_never_regresses(service, monkeypatch):
+    import hashlib
+    import hmac
+    import json
+    monkeypatch.setenv("META_APP_SECRET", "test-secret")
+    message_id = "wamid.test123"
+    delivery_id = str(uuid4())
+    with service.database() as db:
+        db.execute("INSERT INTO deliveries VALUES (?,?,?,?,?,?,?,?,?,?)",
+            (delivery_id, str(uuid4()), "test-employee", "****3829",
+             "REF", "0" * 64, message_id, "accepted", 1, 1))
+
+    def event(state):
+        body = json.dumps({"entry": [{"changes": [{"value": {
+            "statuses": [{"id": message_id, "status": state}]
+        }}]}]}).encode()
+        digest = hmac.new(b"test-secret", body, hashlib.sha256).hexdigest()
+        with TestClient(service.app) as client:
+            response = client.post("/v1/whatsapp/webhook", content=body,
+                headers={"X-Hub-Signature-256": "sha256=" + digest})
+        assert response.status_code == 200
+
+    event("read")
+    event("sent")
+    event("delivered")
+    event("failed")
+    with service.database() as db:
+        state = db.execute("SELECT state FROM deliveries WHERE id=?",
+                           (delivery_id,)).fetchone()[0]
+    assert state == "read"
