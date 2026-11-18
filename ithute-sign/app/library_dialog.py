@@ -249,8 +249,14 @@ class SignedLibraryDialog(QDialog):
         self.properties_button.clicked.connect(self.show_properties)
         self.close_button.clicked.connect(self.reject)
         self.shortcuts = []
+        # Ctrl+C copies a PDF only while a document list has focus.
+        # Search and other editable fields retain normal text-copy behavior.
+        for view in self.lists:
+            copy_shortcut = QShortcut(QKeySequence("Ctrl+C"), view)
+            copy_shortcut.setContext(Qt.WidgetWithChildrenShortcut)
+            copy_shortcut.activated.connect(self.copy_selected)
+            self.shortcuts.append(copy_shortcut)
         for key, action in (("Ctrl+F", self.search.setFocus),
-                            ("Ctrl+C", self.copy_selected),
                             ("Ctrl+S", self.download_selected),
                             ("Ctrl+O", self.open_selected),
                             ("Alt+Left", self.go_back),
