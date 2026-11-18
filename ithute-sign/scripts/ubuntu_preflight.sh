@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Read-only Ubuntu workstation preflight for IthuteSign.
 set -u
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 issues=0
 check() {
   local label="$1"; shift
