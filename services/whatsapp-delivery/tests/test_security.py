@@ -115,3 +115,20 @@ def test_webhook_delivery_status_never_regresses(service, monkeypatch):
         state = db.execute("SELECT state FROM deliveries WHERE id=?",
                            (delivery_id,)).fetchone()[0]
     assert state == "read"
+
+
+def test_standalone_company_identity_is_tenant_bound(monkeypatch):
+    import hashlib
+    from standalone_identity import verify_standalone_identity
+    from fastapi import HTTPException
+    company = uuid4()
+    key = "its_" + "x" * 48
+    monkeypatch.setenv("ITHUTESIGN_COMPANY_ID", str(company))
+    monkeypatch.setenv("ITHUTESIGN_API_KEY_SHA256", hashlib.sha256(key.encode()).hexdigest())
+    assert verify_standalone_identity("Bearer " + key, company) == "standalone:" + str(company)
+    with pytest.raises(HTTPException) as wrong_company:
+        verify_standalone_identity("Bearer " + key, uuid4())
+    assert wrong_company.value.status_code == 403
+    with pytest.raises(HTTPException) as wrong_key:
+        verify_standalone_identity("Bearer its_" + "y" * 48, company)
+    assert wrong_key.value.status_code == 401
