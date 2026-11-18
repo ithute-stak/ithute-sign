@@ -17,7 +17,7 @@ from PySide6.QtCore import Qt, QRectF
 from PySide6.QtGui import QPixmap, QImage, QPainter, QPen, QColor
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QLabel, QPushButton,
     QVBoxLayout, QHBoxLayout, QFileDialog, QMessageBox, QScrollArea, QSpinBox,
-    QDialog, QDialogButtonBox, QListWidget, QProgressBar, QStackedWidget, QStyle)
+    QDialog, QDialogButtonBox, QListWidget, QProgressBar, QStackedWidget, QStyle, QInputDialog)
 from document import to_pdf, sign_pdf_many, Placement, sha256
 from device import probe_bridge, show_screen, validate_signature_png
 from geometry import fit_rectangle
@@ -29,7 +29,7 @@ from loanhub_presentation import employee_display_name
 from loanhub_loans_dialog import LoanHubLoansDialog
 from whatsapp_dialog import WhatsAppDeliveryDialog
 from imail_dialog import IMailDeliveryDialog
-from signed_library import archive_signed_pdf, list_signed_pdfs, verify_archived_pdf
+from signed_library import archive_signed_pdf, list_signed_pdfs, verify_archived_pdf, extract_national_ids, normalize_national_id
 
 def decorate_action(button, label):
     """Use native Qt icons so Linux and Windows need no extra icon packages."""
@@ -1159,7 +1159,25 @@ class Window(QMainWindow):
                 output = str(Path(temporary) / (Path(self.source).stem + "_signed.pdf"))
                 signed_pdf = sign_pdf_many(self.preview_pdf, self.signatures, output,
                                            source_document=self.source)
-                archived_pdf = archive_signed_pdf(signed_pdf)
+                ids = extract_national_ids(signed_pdf)
+                if len(ids) == 1:
+                    national_id = ids[0]
+                    confirmation = QMessageBox.question(
+                        self, "Confirm client National ID",
+                        "File this signed document under National ID: " + national_id + "?",
+                        QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+                    if confirmation != QMessageBox.Yes:
+                        return
+                else:
+                    explanation = ("Multiple National IDs were found." if ids else
+                                   "No labelled National ID was detected.")
+                    entered, accepted = QInputDialog.getText(
+                        self, "Client National ID",
+                        explanation + "\\nEnter the CLIENT'S National ID from the contract:")
+                    if not accepted:
+                        return
+                    national_id = normalize_national_id(entered)
+                archived_pdf = archive_signed_pdf(signed_pdf, national_id=national_id)
             self.last_signed_pdf = str(archived_pdf)
             self.last_signed_pdf_digest = sha256(archived_pdf)
             self.last_signed_source = self.source
@@ -1184,7 +1202,7 @@ class Window(QMainWindow):
         layout.addWidget(QLabel("Saved signed documents (stored locally on this computer)"))
         listing = QListWidget()
         for record, _ in entries:
-            listing.addItem(record["created_at"][:16].replace("T", " ") + "  |  " + record["name"])
+            listing.addItem(record.get("national_id", "Legacy / unassigned") + "  |  " + record["created_at"][:16].replace("T", " ") + "  |  " + record["name"])
         layout.addWidget(listing)
         actions = QHBoxLayout()
         open_button = QPushButton("Open PDF")
