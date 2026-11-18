@@ -152,10 +152,13 @@ def save_loanhub_signed(source, destination, captured):
                 _replace_text(page, field.date, accepted.strftime("%d %b %Y %H:%M %Z"), fontsize=6)
                 _replace_text(page, field.method, method, fontsize=6)
             else:
-                # Small timestamp stays inside the execution box, below the ink.
-                stamp = fitz.Rect(field.box[0], 534.2, field.box[2], 541.8)
-                page.insert_textbox(stamp, accepted.strftime("%d %b %Y %H:%M %Z"),
-                                    fontsize=5.5, fontname="helv", color=(0.09, 0.22, 0.35))
+                # Use an explicit baseline: a 7.6pt textbox can silently
+                # reject text when font ascenders/descenders exceed its height.
+                # The timestamp sits below the signature image.
+                timestamp = accepted.strftime("%d %b %Y %H:%M %Z")
+                page.insert_text((field.box[0], 540.0), timestamp,
+                                 fontsize=5.5, fontname="helv",
+                                 color=(0.09, 0.22, 0.35))
         # Exclusive creation prevents accidental overwrite.
         with destination.open("xb") as out:
             out.write(pdf.tobytes(garbage=4, deflate=True))
@@ -188,8 +191,9 @@ def save_loanhub_signed(source, destination, captured):
                     if method not in signed_page.get_textbox(field.method):
                         raise ValueError("Capture method missing: " + field.role)
                 else:
-                    stamp = fitz.Rect(field.box[0], 534.2, field.box[2], 541.8)
-                    if not signed_page.get_textbox(stamp).strip():
+                    stamp = fitz.Rect(field.box[0], 533.5, field.box[2], 544.5)
+                    expected_stamp = accepted.strftime("%d %b %Y %H:%M %Z")
+                    if expected_stamp not in signed_page.get_textbox(stamp):
                         raise ValueError("Execution timestamp missing: " + field.role)
             if not destination.stat().st_size:
                 raise ValueError("Signed PDF is empty")
