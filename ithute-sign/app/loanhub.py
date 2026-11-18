@@ -41,6 +41,19 @@ def detect_loanhub(pdf):
         status_text = page.get_textbox(status).strip()
         date_text = page.get_textbox(date).strip()
         if status_text == "SIGNED":
+            # A printed status alone cannot establish that a witness signed.
+            # Preserve signed witness fields only when an actual image is
+            # present in that witness signature box.
+            region = fitz.Rect(*box)
+            images = [
+                block for block in page.get_text("dict")["blocks"]
+                if block.get("type") == 1
+                and region.contains(fitz.Rect(block["bbox"]))
+            ]
+            if not images:
+                raise ValueError(
+                    "Witness marked SIGNED but no signature image was found: "
+                    + role + "; manual review required")
             continue
         if status_text != "PENDING" or date_text != "Pending":
             raise ValueError("Unexpected status for " + role + "; review the PDF manually")
