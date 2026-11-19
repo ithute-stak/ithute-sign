@@ -1,12 +1,13 @@
 """Local PDF/Word conversion and image-signature placement; source is never modified."""
 from __future__ import annotations
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 import hashlib
-import json
 import os
-import fitz
+import shutil
+import subprocess
+import tempfile
+import pymupdf as fitz
 
 ALLOWED = {'.pdf', '.docx', '.doc'}
 
@@ -34,13 +35,36 @@ def to_pdf(path: str, destination: str) -> str:
         raise FileNotFoundError(source)
     if source.suffix.lower() == '.pdf':
         return str(source)
-    if os.name != 'nt':
-        raise RuntimeError('Word conversion requires Windows with Microsoft Word installed.')
-    import pythoncom
-    import win32com.client
     target = Path(destination).resolve()
     if target == source:
         raise ValueError('Conversion output cannot overwrite source')
+    if target.suffix.lower() != '.pdf':
+        raise ValueError('Conversion output must be a PDF')
+    if target.exists():
+        raise FileExistsError('Conversion output already exists')
+    if os.name != 'nt':
+        office = shutil.which('libreoffice') or shutil.which('soffice')
+        if not office:
+            raise RuntimeError('LibreOffice is required to convert Word documents on Ubuntu.')
+        with tempfile.TemporaryDirectory(prefix='ithutesign-convert-') as scratch:
+            scratch_dir = Path(scratch)
+            profile = (scratch_dir / 'profile').as_uri()
+            result = subprocess.run(
+                [office, '-env:UserInstallation=' + profile, '--headless',
+                 '--convert-to', 'pdf', '--outdir', str(scratch_dir), str(source)],
+                capture_output=True, text=True, timeout=90, check=False)
+            produced = scratch_dir / (source.stem + '.pdf')
+            if result.returncode != 0 or not produced.is_file() or produced.stat().st_size == 0:
+                raise RuntimeError('LibreOffice could not convert the document to PDF.')
+            with fitz.open(str(produced)) as verified:
+                if verified.needs_pass or len(verified) == 0:
+                    raise ValueError('Converted PDF is encrypted or empty')
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with target.open('xb') as out, produced.open('rb') as incoming:
+                shutil.copyfileobj(incoming, out)
+        return str(target)
+    import pythoncom
+    import win32com.client
     pythoncom.CoInitialize()
     word = None
     doc = None
@@ -101,11 +125,7 @@ def sign_pdf_many(source_pdf, placements, destination, source_document=None):
         raise ValueError('Output filename must end in .pdf')
     if output.exists():
         raise FileExistsError('Output already exists; choose a new filename')
-    if Path(str(output) + '.audit.json').exists():
-        raise FileExistsError('Audit output already exists')
-    audit_path = Path(str(output) + '.audit.json')
     created_pdf = False
-    created_audit = False
     try:
         with fitz.open(str(source)) as doc:
             if doc.needs_pass or len(doc) == 0:
@@ -120,28 +140,8 @@ def sign_pdf_many(source_pdf, placements, destination, source_document=None):
         with fitz.open(str(output)) as verify:
             if len(verify) == 0 or verify.needs_pass:
                 raise RuntimeError('Exported PDF could not be verified')
-        audit = {
-            'format_version': 2,
-            'created_utc': datetime.now(timezone.utc).isoformat(),
-            'source_name': original.name,
-            'source_sha256': sha256(original),
-            'source_pdf_sha256': sha256(source),
-            'signed_pdf_sha256': sha256(output),
-            'signatures': [
-                {'page_index_zero_based': p.page_index,
-                 'rect_pdf_points': [p.x, p.y, p.width, p.height],
-                 'signature_image_sha256': sha256(p.signature_png)}
-                for p in placements
-            ],
-            'method': 'visual signature images; NOT a cryptographic digital signature',
-        }
-        with audit_path.open('x', encoding='utf-8') as f:
-            created_audit = True
-            json.dump(audit, f, indent=2)
-        return str(audit_path)
+        return str(output)
     except BaseException:
-        if created_audit:
-            audit_path.unlink(missing_ok=True)
         if created_pdf:
             output.unlink(missing_ok=True)
         raise

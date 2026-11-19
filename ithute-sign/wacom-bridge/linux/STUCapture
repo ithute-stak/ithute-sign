@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -euo pipefail
+HERE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+SDK="${WACOM_STU_SDK_LINUX:-$HOME/wacom-stu-sdk/sdk-extracted/Linux}"
+JAR="$SDK/any/wgssSTU.jar"
+NATIVE="$SDK/x86_64"
+if [[ ! -f "$JAR" || ! -d "$NATIVE" ]]; then
+  echo "Wacom Linux SDK missing. Set WACOM_STU_SDK_LINUX to its Linux directory." >&2
+  exit 11
+fi
+BUILD="${XDG_CACHE_HOME:-$HOME/.cache}/ithutesign/stu-java"
+mkdir -p "$BUILD"
+if [[ ! -f "$BUILD/STUCapture.class" || "$HERE/STUCapture.java" -nt "$BUILD/STUCapture.class" ]]; then
+  javac -cp "$JAR" -d "$BUILD" "$HERE/STUCapture.java"
+fi
+export LD_LIBRARY_PATH="$NATIVE${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+# Serialize access across signing sessions and the optional idle watcher.
+LOCK_DIR="${XDG_RUNTIME_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/ithutesign}"
+mkdir -p "$LOCK_DIR"
+exec 9>"$LOCK_DIR/stu540-device.lock"
+if [[ "${ITHUTESIGN_LOCK_NONBLOCK:-0}" == "1" ]]; then
+  flock -n 9 || exit 75
+else
+  flock -x 9
+fi
+exec java --enable-native-access=ALL-UNNAMED -Djava.library.path="$NATIVE" -cp "$BUILD:$JAR" STUCapture "$@"

@@ -73,7 +73,7 @@ def validate_signature_png(path):
     if depth != 8 or color_type not in (4, 6):
         raise ValueError("Signature PNG must have an alpha channel")
     # Decode pixels rather than trusting the PNG header or file size.
-    import fitz
+    import pymupdf as fitz
     pixmap = fitz.Pixmap(str(target))
     if not pixmap.alpha:
         raise ValueError("Signature PNG has no alpha channel")

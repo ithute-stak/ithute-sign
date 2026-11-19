@@ -1,0 +1,57 @@
+name: Signed Library UI Regression
+
+on:
+  push:
+    branches:
+      - feat/linux-stu540-java-bridge-20261117
+    paths:
+      - "ithute-sign/wacom-bridge/linux/STUCapture.java"
+      - "ithute-sign/wacom-bridge/linux/STUCapture"
+      - "ithute-sign/wacom-bridge/linux/check-compile.sh"
+      - "ithute-sign/app/library_dialog.py"
+      - "ithute-sign/app/library_export.py"
+      - "ithute-sign/app/library_clipboard.py"
+      - "ithute-sign/app/pdf_preview.py"
+      - "ithute-sign/app/signed_library.py"
+      - "ithute-sign/tests/test_library_dialog_ui.py"
+      - "ithute-sign/tests/test_library_export.py"
+      - ".github/workflows/signed-library-ui.yml"
+  pull_request:
+    paths:
+      - "ithute-sign/app/library_dialog.py"
+      - "ithute-sign/app/library_export.py"
+      - "ithute-sign/app/library_clipboard.py"
+      - "ithute-sign/app/pdf_preview.py"
+      - "ithute-sign/app/signed_library.py"
+      - "ithute-sign/tests/test_library_dialog_ui.py"
+      - "ithute-sign/tests/test_library_export.py"
+      - ".github/workflows/signed-library-ui.yml"
+  workflow_dispatch:
+
+jobs:
+  explorer-regression:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ithute-sign
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install Qt runtime libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libopengl0 libxkbcommon-x11-0
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install PySide6 PyMuPDF pytest
+      - name: Compile library modules
+        run: python -m py_compile app/library_dialog.py app/library_export.py app/library_clipboard.py app/pdf_preview.py app/signed_library.py
+      - name: Validate Linux STU-540 launcher and compile-check scripts
+        run: bash -n wacom-bridge/linux/STUCapture wacom-bridge/linux/check-compile.sh
+      - name: Run library regression tests
+        run: python -m pytest tests/test_signed_library.py tests/test_library_export.py tests/test_library_dialog_ui.py -q
